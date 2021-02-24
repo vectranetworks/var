@@ -1,0 +1,6 @@
+HOSTNAME = "172.16.12.125"
+CHECK_SSL = False
+CLIENT_ID = "vectra"
+CLIENT_SECRET = "36wx2k+0Hbh5hrYB+zC39VLJ/MoXwRmAWVxi9f/iMXy5"
+USERNAME = "vectra-api"
+PASSWORD = "admin123"

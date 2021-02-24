@@ -3,8 +3,8 @@ import logging
 import json
 from requests import HTTPError
 from enum import Enum, unique, auto
-from firewall_clients.firewall_interface import FWCLientInterface
-from firewall_clients.fortinet_config import INTERNAL_BLOCK_POLICY, EXTERNAL_BLOCK_POLICY, FIREWALLS
+from third_party_clients.third_party_interface import ThirdPartyInterface
+from third_party_clients.fortinet.fortinet_config import INTERNAL_BLOCK_POLICY, EXTERNAL_BLOCK_POLICY, FIREWALLS
 
 @unique
 class BlockType(Enum):
@@ -15,7 +15,7 @@ class BlockType(Enum):
     SOURCE = auto()
     DESTINATION = auto()
 
-class FortiClient(FWCLientInterface):
+class FortiClient(ThirdPartyInterface):
     def __init__(self):
         self.logger = logging.getLogger()
         self.internal_block_policy_name = INTERNAL_BLOCK_POLICY
@@ -28,7 +28,7 @@ class FortiClient(FWCLientInterface):
             self.logger.error('Please configure firewall instances in config.py')
             raise e
         # Instantiate parent class
-        FWCLientInterface.__init__ (self)
+        ThirdPartyInterface.__init__ (self)
 
     def block_host(self, host):
         ip_address = host.ip

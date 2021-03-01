@@ -10,6 +10,8 @@ class VectraHost:
         self.targets_key_asset = host['targets_key_asset']
         self.artifacts_types = self._get_artifact_types(host['host_artifact_set'])
         self.mac_addresses = self._get_host_mac_addresses(host['host_artifact_set'])
+        self.vmware_vm_name = self._get_vmware_vm_name(host['host_artifact_set'])
+        self.vmware_vm_uuid = self._get_vmware_vm_uuid(host['host_artifact_set'])
         self.aws_vm_uuid = self._get_aws_vm_uuid(host['host_artifact_set'])
         self.tags = self._get_external_tags(host['tags'])
         self.note = host['note']
@@ -27,6 +29,18 @@ class VectraHost:
             if artifact['type'] == 'mac':
                 mac_addresses.add(artifact['value'])
         return list(mac_addresses)
+
+    def _get_vmware_vm_name(self, artifact_set):
+        for artifact in artifact_set:
+            if artifact['type'] == 'vmachine_info':
+                return artifact['value']
+        return None
+
+    def _get_vmware_vm_uuid(self, artifact_set):
+        for artifact in artifact_set:
+            if artifact['type'] == 'vm_uuid':
+                return artifact['value']
+        return None
 
     def _get_aws_vm_uuid(self, artifact_set):
         for artifact in artifact_set:

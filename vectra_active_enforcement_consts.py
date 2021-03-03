@@ -56,11 +56,11 @@ class VectraHost:
         return blocked_elements
 
     def _get_external_tags(self, tags):
-        tags = []
+        tags_to_keep = []
         for tag in tags:
             if not tag.startswith('VAE ID:') and not tag == 'VAE Blocked':
-                tags.append(tag)
-        return tags
+                tags_to_keep.append(tag)
+        return tags_to_keep
 
     def add_blocked_element(self, element):
         self.blocked_elements.append(element)

@@ -5,12 +5,12 @@ import vat.vectra as vectra
 from datetime import datetime
 from typing import Union, Optional, Dict
 from vectra_active_enforcement_consts import VectraHost, VectraDetection
-from third_party_clients.fortinet.fortinet import FortiClient
+from third_party_clients.clearpass import clearpass
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, UNBLOCK_HOST_TAG, 
     NO_BLOCK_HOST_GROUP_NAME, BLOCK_HOST_THREAT_CERTAINTY, BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
     BLOCK_HOST_DETECTION_TYPES, EXTERNAL_BLOCK_HOST_TC,EXTERNAL_BLOCK_DETECTION_TAG, 
-    EXTERNAL_BLOCK_DETECTION_TYPES, EXTERNAL_UNBLOCK_DETECTION_TAG)
+    BLOCK_HOST_GROUP_NAME, EXTERNAL_BLOCK_DETECTION_TYPES, EXTERNAL_UNBLOCK_DETECTION_TAG)
 
 
 HostDict = Dict[str, VectraHost] 
@@ -51,7 +51,7 @@ class VectraClient(vectra.VectraClientV2_2):
         :param token: API token for authentication - required
         :param verify: verify SSL - optional
         """
-        vectra.VectraClientV2_1.__init__(self, url=url, token=token, verify=verify)
+        vectra.VectraClientV2_2.__init__(self, url=url, token=token, verify=verify)
         self.logger = logging.getLogger('VectraClient')
 
     def get_hosts_in_group(self, group_name: str) -> HostDict:
@@ -172,6 +172,7 @@ class VectraClient(vectra.VectraClientV2_2):
     def get_hosts_to_block(self, 
             block_tag: Optional[str] = None, 
             min_tc_score: Optional[tuple] = None, 
+            block_host_group_name: Optional[str] = None,
             block_host_detection_types: list = [], 
             block_host_detections_types_min_host_tc: tuple = (0,'and',0)
             ) -> HostDict:
@@ -184,8 +185,9 @@ class VectraClient(vectra.VectraClientV2_2):
         """
         tagged_hosts = self.get_tagged_hosts(tag=block_tag) if block_tag else {}
         scored_hosts = self.get_scored_hosts(tc_tuple = min_tc_score) if isinstance(min_tc_score, tuple) else {}
+        group_members = self.get_hosts_in_group(group_name=block_host_group_name)
         hosts_with_detection_types = self.get_hosts_with_detection_types(block_host_detection_types, block_host_detections_types_min_host_tc) if block_host_detection_types else {}
-        return {**tagged_hosts, **scored_hosts, **hosts_with_detection_types}
+        return {**tagged_hosts, **scored_hosts, **group_members, **hosts_with_detection_types}
 
     def get_tagged_detections(self, tag: str) -> DetectionDict:
         """
@@ -303,6 +305,7 @@ class VectraActiveEnforcement(object):
             vectra_api_client: VectraClient, 
             block_host_tag: Optional[str],
             block_host_tc_score: tuple, 
+            block_host_group_name: Optional[str],
             block_host_detection_types: list,
             block_host_detections_types_min_host_tc: tuple,
             unblock_host_tag: Optional[str], 
@@ -319,6 +322,7 @@ class VectraActiveEnforcement(object):
         # Internal (un)blocking variables  
         self.block_host_tag = block_host_tag
         self.block_host_tc_score = block_host_tc_score
+        self.block_host_group_name = block_host_group_name
         self.block_host_detection_types = block_host_detection_types
         self.block_host_detections_types_min_host_tc = block_host_detections_types_min_host_tc
         self.unblock_host_tag = unblock_host_tag
@@ -362,6 +366,7 @@ class VectraActiveEnforcement(object):
         matching_hosts = self.vectra_api_client.get_hosts_to_block(
                 block_tag=self.block_host_tag, 
                 min_tc_score=self.block_host_tc_score,
+                block_host_group_name=self.block_host_group_name,
                 block_host_detection_types=self.block_host_detection_types,
                 block_host_detections_types_min_host_tc=self.block_host_detections_types_min_host_tc
             )
@@ -424,7 +429,7 @@ class VectraActiveEnforcement(object):
                     for element in host.blocked_elements:
                         tag_to_set.append('VAE ID: {}'.format(element))
                     self.vectra_api_client.set_host_tags(host_id=host_id, tags=tag_to_set, append=True)
-                    self.vectra_api_client.set_host_note(host_id=host.id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')), append=False)
+                    self.vectra_api_client.set_host_note(host_id=host_id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
                     self.logger.debug('Added Tags to host')
                 except HTTPException as e:
                     self.logger.error('Error encountered trying to block Host ID {}: {}'.format(host.id, str(e)))
@@ -489,13 +494,14 @@ class VectraActiveEnforcement(object):
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    fortinet_client = FortiClient()
+    clearpass_client = clearpass.ClearPassClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-            fw_clients = [fortinet_client], 
+            fw_clients = [clearpass_client], 
             vectra_api_client = vectra_api_client,
             block_host_tag = BLOCK_HOST_TAG,
             block_host_tc_score = BLOCK_HOST_THREAT_CERTAINTY, 
+            block_host_group_name = BLOCK_HOST_GROUP_NAME,
             block_host_detection_types = BLOCK_HOST_DETECTION_TYPES,
             block_host_detections_types_min_host_tc = BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
             unblock_host_tag = UNBLOCK_HOST_TAG, 
@@ -506,10 +512,10 @@ def main():
             external_unblock_detection_tag = EXTERNAL_UNBLOCK_DETECTION_TAG
         )
 
-    #hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
-    detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
-    #vae.block_hosts(hosts_to_block)
-    #vae.unblock_hosts(hosts_to_unblock)
+    hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
+    #detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
+    vae.block_hosts(hosts_to_block)
+    vae.unblock_hosts(hosts_to_unblock)
 
 
 if __name__ == '__main__':

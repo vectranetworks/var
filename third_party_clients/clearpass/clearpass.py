@@ -13,7 +13,7 @@ class ClearPassClient(ThirdPartyInterface):
         self.url = "https://" + HOSTNAME + "/api"
         self.verify = CHECK_SSL
         try:
-            url_oauth = "{url}/oauth".format(self.url)
+            url_oauth = "{url}/oauth".format(url=self.url)
             params_oauth = {
                 "grant_type": "password",
                 "client_id": CLIENT_ID,
@@ -38,7 +38,7 @@ class ClearPassClient(ThirdPartyInterface):
     def block_host(self, host):
         mac_addresses = host.mac_addresses
         for mac_address in mac_addresses:
-            self._patch_endpoints(mac_address, isolated=True)
+            self._patch_endpoint(mac_address, isolated=True)
             self._disconnect_session(mac_address)
             host.add_blocked_element(mac_address)
         return host
@@ -46,7 +46,7 @@ class ClearPassClient(ThirdPartyInterface):
     def unblock_host(self, host):
         mac_addresses = host.mac_addresses
         for mac_address in mac_addresses:
-            self._patch_endpoints(mac_address, isolated=False)
+            self._patch_endpoint(mac_address, isolated=False)
             self._disconnect_session(mac_address)
             host.add_blocked_element(mac_address)
         return host
@@ -58,7 +58,7 @@ class ClearPassClient(ThirdPartyInterface):
         raise NotImplementedError
 
     def _patch_endpoint(self, mac_address, isolated=False):
-        patch_endpoint_url = "{url}/endpoint/mac-address/{mac_address}".format(self.url, mac_address)
+        patch_endpoint_url = "{url}/endpoint/mac-address/{mac_address}".format(url=self.url, mac_address=mac_address)
         params_patch_endpoint = {
             "mac_address": mac_address,
             "attributes": {
@@ -72,7 +72,7 @@ class ClearPassClient(ThirdPartyInterface):
         """ 
         Disconnects host session 
         """
-        disconnect_url = "{url}/session-action/disconnect/mac/" + mac_address + "?async=false"
+        disconnect_url = "{url}/session-action/disconnect/mac/{mac_address}?async=false".format(url=self.url, mac_address=mac_address)
         disconnect = requests.post(url=disconnect_url, headers=self.bearer, verify=self.verify)
         disconnect.raise_for_status()
         

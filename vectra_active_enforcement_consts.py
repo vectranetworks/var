@@ -1,3 +1,5 @@
+import ipaddress
+
 class VectraHost:
     def __init__(self, host):
         self.id = host['id']
@@ -65,6 +67,7 @@ class VectraHost:
     def add_blocked_element(self, element):
         self.blocked_elements.append(element)
 
+
 class VectraDetection:
     def __init__(self, detection):
         self.id = detection['id']
@@ -78,13 +81,14 @@ class VectraDetection:
         self.t_score = detection['t_score']
         self.targets_ka = detection['targets_key_asset']
         self.triage = detection['triage_rule_id']
-        self.tags = detection['tags']
+        self.tags = self._get_external_tags(detection['tags'])
         self.blocked_elements = self._get_blocked_elements(detection['tags'])
 
     def _get_dst_ips(self, detection):
         dst_ips = set()
         for ip in detection['summary'].get('dst_ips', []):
-            dst_ips.add(ip)
+            if not ipaddress.ip_address(ip).is_private:
+                dst_ips.add(ip)
         return list(dst_ips)
 
     def _get_dst_domains(self, detection):

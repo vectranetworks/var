@@ -1,23 +1,29 @@
 import logging
 import requests
 import logging
+import ipaddress
 import vat.vectra as vectra
 from datetime import datetime
 from typing import Union, Optional, Dict
 from vectra_active_enforcement_consts import VectraHost, VectraDetection
-from third_party_clients.clearpass import clearpass
+from third_party_clients.fortinet import fortinet
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, UNBLOCK_HOST_TAG, 
+from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE,
     NO_BLOCK_HOST_GROUP_NAME, BLOCK_HOST_THREAT_CERTAINTY, BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
     BLOCK_HOST_DETECTION_TYPES, EXTERNAL_BLOCK_HOST_TC,EXTERNAL_BLOCK_DETECTION_TAG, 
-    BLOCK_HOST_GROUP_NAME, EXTERNAL_BLOCK_DETECTION_TYPES, EXTERNAL_UNBLOCK_DETECTION_TAG)
+    BLOCK_HOST_GROUP_NAME, EXTERNAL_BLOCK_DETECTION_TYPES)
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 HostDict = Dict[str, VectraHost] 
 DetectionDict = Dict[str, VectraDetection] 
 
-logging.basicConfig(level=logging.INFO)
-requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+if LOG_TO_FILE:
+    logging.basicConfig(filename=LOG_FILE, format='%(asctime)s %(message)s', encoding='utf-8', level=logging.INFO)
+else:
+    logging.basicConfig(level=logging.INFO)
 
 
 class HTTPException(Exception):
@@ -158,16 +164,13 @@ class VectraClient(vectra.VectraClientV2_2):
                 continue
         return hosts
 
-    def get_noblock_hosts(self, no_block_group: Optional[str] = None, no_block_tag: Optional[str] = None) -> HostDict:
+    def get_noblock_hosts(self, no_block_group: Optional[str] = None) -> HostDict:
         """
         Get all host IDs which should not be blocked
         :param no_block_group: group name containing hosts which should never be blocked - optional
-        :param no_block_tag: tag defining host to never block or unblock - optional
         :rtype: HostDict
         """
-        no_block_tagged_hosts = self.get_tagged_hosts(tag=no_block_tag) if no_block_tag else {}
-        no_block_group_hosts = self.get_hosts_in_group(group_name=no_block_group) if no_block_group else {}
-        return {**no_block_tagged_hosts, **no_block_group_hosts}
+        return self.get_hosts_in_group(group_name=no_block_group) if no_block_group else {}
 
     def get_hosts_to_block(self, 
             block_tag: Optional[str] = None, 
@@ -239,8 +242,8 @@ class VectraClient(vectra.VectraClientV2_2):
         for detection_id in detection_ids:
             r = self.get_detection_by_id(detection_id=detection_id)
             detection = r.json()
-            # Ignore info detections
-            if detection.get('category') != 'INFO':
+            # Ignore info detections, custom and inactive ones
+            if detection.get('category') != 'INFO' and detection.get('state') == 'active' and detection.get('is_triaged') == False:
                 detections[detection['id']] = VectraDetection(detection)
         return detections
 
@@ -272,16 +275,13 @@ class VectraClient(vectra.VectraClientV2_2):
             detections.update(self.get_detections_on_host(host_id=host_id))
         return detections
 
-    def get_noblock_detections(self, no_block_group: Optional[str] = None, no_block_tag: Optional[str] = None) -> DetectionDict:
+    def get_noblock_detections(self, no_block_group: Optional[str] = None) -> DetectionDict:
         """
         Get a dict of all detection IDs which should not be blocked given the parameters. 
         :param no_block_group: name of the host group whose member detections should never be blocked - optional
-        :param no_block_tag: tag defning detections which should not be blocked or unblocked - optional
         :rtype: DetectionDict
         """
-        no_block_tagged_detections = self.get_tagged_detections(tag=no_block_tag) if no_block_tag else {}
-        no_block_group_detections = self.get_detections_on_hosts_in_group(group_name=no_block_group) if no_block_group else {}
-        return {**no_block_tagged_detections, **no_block_group_detections}
+        return self.get_detections_on_hosts_in_group(group_name=no_block_group) if no_block_group else {}
 
     def get_detections_to_block(self, block_tag: Optional[str] = None, detection_types_to_block: Optional[list] = None, min_host_tc_score: Optional[tuple] = None) -> DetectionDict:
         """
@@ -308,12 +308,10 @@ class VectraActiveEnforcement(object):
             block_host_group_name: Optional[str],
             block_host_detection_types: list,
             block_host_detections_types_min_host_tc: tuple,
-            unblock_host_tag: Optional[str], 
             no_block_host_group_name: Optional[str],
             external_block_host_tc: tuple,
             external_block_detection_types:list,
             external_block_detection_tag: Optional[str],
-            external_unblock_detection_tag: Optional[str]
         ):
         # Generic setup
         self.logger = logging.getLogger()
@@ -325,13 +323,11 @@ class VectraActiveEnforcement(object):
         self.block_host_group_name = block_host_group_name
         self.block_host_detection_types = block_host_detection_types
         self.block_host_detections_types_min_host_tc = block_host_detections_types_min_host_tc
-        self.unblock_host_tag = unblock_host_tag
         self.no_block_host_group_name = no_block_host_group_name
         # External (un)blocking variables
         self.external_block_host_tc = external_block_host_tc
         self.external_block_detection_types = external_block_detection_types
         self.external_block_detection_tag = external_block_detection_tag
-        self.external_unblock_detection_tag = external_unblock_detection_tag
 
     @staticmethod
     def _get_dict_keys_intersect(dict1, dict2):
@@ -361,7 +357,7 @@ class VectraActiveEnforcement(object):
         :rtype: list
         """
         # Set of all host IDs that should never be blocked
-        no_block_hosts = self.vectra_api_client.get_noblock_hosts(no_block_group=self.no_block_host_group_name, no_block_tag=self.unblock_host_tag)
+        no_block_hosts = self.vectra_api_client.get_noblock_hosts(no_block_group=self.no_block_host_group_name)
         # Get a dict of hosts to block
         matching_hosts = self.vectra_api_client.get_hosts_to_block(
                 block_tag=self.block_host_tag, 
@@ -390,9 +386,9 @@ class VectraActiveEnforcement(object):
 
     def get_detections_to_block_unblock(self):
         # Get a list of all detections that should be unblocked or never blocked
-        no_block_detections = self.vectra_api_client.get_noblock_detections(no_block_group=self.no_block_host_group_name, no_block_tag=self.external_unblock_detection_tag)
+        no_block_detections = self.vectra_api_client.get_noblock_detections(no_block_group=self.no_block_host_group_name)
         # Get a dict of detections to block
-        detections_to_block = self.vectra_api_client.get_detections_to_block(
+        matching_detections = self.vectra_api_client.get_detections_to_block(
             block_tag=self.external_block_detection_tag, 
             detection_types_to_block=self.external_block_detection_types,
             min_host_tc_score=self.external_block_host_tc
@@ -404,12 +400,12 @@ class VectraActiveEnforcement(object):
         detections_wrongly_blocked = self._get_dict_keys_intersect(blocked_detections, no_block_detections)
         self.logger.info('Found {} blocked detections that are now part of the no-block lists'.format(str(len(detections_wrongly_blocked.keys()))))
         # Compute detections that should be blocked
-        detections_to_block = self._get_dict_keys_relative_complement(detections_to_block, blocked_detections)
+        detections_to_block = self._get_dict_keys_relative_complement(matching_detections, blocked_detections)
         # Take into account exclusions
         detections_to_block = self._get_dict_keys_relative_complement(detections_to_block, no_block_detections)
         self.logger.info('Found {} detections that need to be blocked'.format(str(len(detections_to_block.keys()))))
         # Compute detections that should be unblocked
-        detections_to_unblock = self._get_dict_keys_relative_complement(blocked_detections, detections_to_block)
+        detections_to_unblock = self._get_dict_keys_relative_complement(blocked_detections, matching_detections)
         # Add wrongly blocked detections
         detections_to_unblock  = {**detections_to_unblock, **detections_wrongly_blocked}
         self.logger.info('Found {} detections that need to be unblocked'.format(str(len(detections_to_unblock.keys()))))
@@ -460,32 +456,29 @@ class VectraActiveEnforcement(object):
                 try:
                     # Quarantaine endpoint
                     detection = firewall.block_detection(detection=detection)
-                    self.logger.info('Blocked detection {} on firewall'.format(detection.name))
                     # Set a "VAE Blocked" to set the detection as being blocked and registed what elements were blocked in separate tags
                     tag_to_set = ['VAE Blocked']
                     if len(detection.blocked_elements) < 1:
-                        raise HTTPException('No elements blocked by FW')
+                        self.logger.warning('Did not find any elements to block on detection ID {}'.format(detection.id))
                     for element in detection.blocked_elements:
                         tag_to_set.append('VAE ID: {}'.format(element))
+                    self.logger.info('Blocked detection ID {} on firewall'.format(detection.id))
                     self.vectra_api_client.set_detection_tags(detection_id=detection_id, tags=tag_to_set, append=True)
-                    self.vectra_api_client.set_detection_note(detection_id=detection.id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')), append=False)
+                    self.vectra_api_client.set_detection_note(detection_id=detection.id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
                     self.logger.debug('Added Tags to detection')
                 except HTTPException as e:
                     self.logger.error('Error encountered trying to block detection ID {}: {}'.format(detection.id, str(e)))
 
     def unblock_detections(self, detections_to_unblock):
         for detection_id, detection in detections_to_unblock.items():
-            if len(detection.blocked_elements) < 1:
-                self.logger.error('Could not find what was blocked on detection {}'.format(detection.name))
-                continue
             for firewall in self.fw_clients:
                 try:
                     detection = firewall.unblock_detection(detection)
-                    self.logger.info('Unquaratained detection {}'.format(detection.name))
+                    self.logger.info('Unquaratained detection ID {}'.format(detection.id))
                     # Remove all tags set by this script from the detection.
                     # Sometimes a detection can have both a block and unblock tag, we need to correct this. 
                     if 'block' in detection.tags:
-                        self.logger.warning('detection {} is in no-block list but has a "block" tag. Removing tag..'.format(detection['name']))
+                        self.logger.warning('detection ID {} is in no-block list but has a "block" tag. Removing tag..'.format(detection.id))
                         detection.tags.remove('block')
                     self.vectra_api_client.set_detection_tags(detection_id=detection_id, tags=detection.tags, append=False)
                     self.logger.debug('Removed tags')
@@ -493,29 +486,31 @@ class VectraActiveEnforcement(object):
                     self.logger.error('Error encountered trying to unblock detection ID {}: {}'.format(detection.id, str(e)))
 
 def main():
-    logging.basicConfig(level=logging.INFO)
-    clearpass_client = clearpass.ClearPassClient()
+    forti_client = fortinet.FortiClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-            fw_clients = [clearpass_client], 
+            fw_clients = [forti_client], 
             vectra_api_client = vectra_api_client,
             block_host_tag = BLOCK_HOST_TAG,
             block_host_tc_score = BLOCK_HOST_THREAT_CERTAINTY, 
             block_host_group_name = BLOCK_HOST_GROUP_NAME,
             block_host_detection_types = BLOCK_HOST_DETECTION_TYPES,
             block_host_detections_types_min_host_tc = BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
-            unblock_host_tag = UNBLOCK_HOST_TAG, 
             no_block_host_group_name = NO_BLOCK_HOST_GROUP_NAME,
             external_block_host_tc = EXTERNAL_BLOCK_HOST_TC,
             external_block_detection_types = EXTERNAL_BLOCK_DETECTION_TYPES,
             external_block_detection_tag = EXTERNAL_BLOCK_DETECTION_TAG,
-            external_unblock_detection_tag = EXTERNAL_UNBLOCK_DETECTION_TAG
         )
 
     hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
-    #detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
     vae.block_hosts(hosts_to_block)
     vae.unblock_hosts(hosts_to_unblock)
+
+    detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
+    vae.block_detections(detections_to_block)
+    vae.unblock_detections(detections_to_unblock)
+
+    logging.info('Run finished\n\n\n')
 
 
 if __name__ == '__main__':

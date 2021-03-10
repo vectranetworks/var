@@ -1,17 +1,17 @@
 ### GENERAL SETUP
 # Vectra brain API access.
-COGNITO_URL = 'https://vectra.maxonmotor.com/'
-COGNITO_TOKEN = 'c5a6eb331c9c94a99d335213faf595e68f90b25e'
+COGNITO_URL = 'https://demo.vectra.io'
+COGNITO_TOKEN = 'bf9e8f72f8e351c77a1ef03cfaa538d5a8797090'
+LOG_TO_FILE = False
+LOG_FILE = 'vae.log'
 
 ### INTERNAL IP BLOCKING
-# Tag that will cause a host to be blocked.
+# Tag that will cause a host to be blocked; remove the tag to unblock the host
 BLOCK_HOST_TAG = 'block'
-# Tag to unblock a host, AND prevent it from being blocked again as long as present.
-UNBLOCK_HOST_TAG = 'noblock'
 # Host group for which member will NEVER be blocked.
 NO_BLOCK_HOST_GROUP_NAME = 'NoBlock'
 # Host groupfor which all members will be blocked
-BLOCK_HOST_GROUP_NAME = 'maxon - Clearpass Client blocking'
+BLOCK_HOST_GROUP_NAME = 'Block'
 # Threshold threat/certainty score for automatically blocking host.
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 BLOCK_HOST_THREAT_CERTAINTY = (100, 'and', 100)
@@ -25,10 +25,8 @@ BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE = (100, 'or', 100)
 # All external IPs in those detections will then be blocked. 
 # The middle argument can be 'and' or 'or', defining how the threshold conditions are read
 EXTERNAL_BLOCK_HOST_TC = (100, 'and', 100)
-# Tag to block external IPs present in detection.
+# Tag to block external IPs present in detection; remove the tag to unblock the detection.
 EXTERNAL_BLOCK_DETECTION_TAG = 'block'
 # Detection types for which we will block all external IPs present on those.
 # E.g. "Ransomware File Activity,Shell Knocker"
 EXTERNAL_BLOCK_DETECTION_TYPES = []
-# Tag to unblock a detection, AND prevent it from being blocked again as long as present.
-EXTERNAL_UNBLOCK_DETECTION_TAG = 'noblock'

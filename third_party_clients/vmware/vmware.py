@@ -22,33 +22,28 @@ class VMWareClient(ThirdPartyInterface):
     def __init__(self):
         self.logger = logging.getLogger()
         context = ssl._create_unverified_context()
-        self.vcsa_hosts = []
+        self.vcsa_hosts_service_instances = {}
         for vcsa in VCSA_HOSTS:
-            vcsa_dict = {}
             # Instantiate a connector for the VCSA
             si = SmartConnect(host=vcsa['HOST'], user=vcsa['USER'], pwd=vcsa['PASS'], sslContext=context)
             if not si:
                 raise HTTPError("Cannot connect to specified host using specified username and password")
             atexit.register(Disconnect, si)
-            vcsa_dict['si'] = si
+            self.vcsa_hosts_service_instances[vcsa['HOST']] = si
+        # Instantiate parent class
+        ThirdPartyInterface.__init__ (self)
+
+    def block_host(self, host):
+        print(host.vmware_vm_uuid)
+        for host, si in self.vcsa_hosts_service_instances.items():
             # Get the list of VM objects for each vCenter that could potentially be blocked
-            vcsa_dict['vm_objects'] = []
             content = si.RetrieveContent()
             objView = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)
             vmList = objView.view
             objView.Destroy()
             for vm in vmList:
-                if vm.name == "Debian10":
-                    vcsa_dict['vm_objects'].append(vm)           
-        # Instantiate parent class
-        ThirdPartyInterface.__init__ (self)
-
-    def block_host(self, host):
-        ip_address = host.ip
-        for firewall in self.firewalls:
-            self.register_address(firewall, ip_address)
-            self.update_fortinet_group(firewall, ip_address=ip_address, block_type=BlockType.SOURCE)
-        host.add_blocked_element(ip_address)
+                print(vm.name)
+        exit()      
         return host
 
     def unblock_host(self, host):
@@ -63,12 +58,12 @@ class VMWareClient(ThirdPartyInterface):
         return host
     
     def block_detection(self, detection):
-        """Load in the data set"""
-        raise NotImplementedError
+        # this client only implements Host-basd blocking
+        return detection
 
     def unblock_detection(self, detection):
-        """Load in the data set"""
-        raise NotImplementedError
+        # this client only implements Host-basd blocking
+        return detection
     
     def wait_for_tasks(self, service_instance, tasks):
         """Given the service instance si and tasks, it returns after all the

@@ -4,9 +4,12 @@ import logging
 import ipaddress
 import vat.vectra as vectra
 from datetime import datetime
+from requests import HTTPError
 from typing import Union, Optional, Dict
 from vectra_active_enforcement_consts import VectraHost, VectraDetection
 from third_party_clients.fortinet import fortinet
+from third_party_clients.vmware import vmware
+from third_party_clients.test_client import test_client
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE,
     NO_BLOCK_HOST_GROUP_NAME, BLOCK_HOST_THREAT_CERTAINTY, BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
@@ -68,13 +71,16 @@ class VectraClient(vectra.VectraClientV2_2):
         """
         hosts = {}
         r = self.get_all_groups(name=group_name)
-        for page in r:
-            for group in page.json()['results']:
-                for member in group['members']:
-                    host = self.get_host_by_id(host_id=member['id']).json()
-                    if host['id'] not in hosts:
-                        hosts[host['id']] = VectraHost(host)
-        return hosts
+        try:
+            for page in r:
+                for group in page.json()['results']:
+                    for member in group['members']:
+                        host = self.get_host_by_id(host_id=member['id']).json()
+                        if host['id'] not in hosts:
+                            hosts[host['id']] = VectraHost(host)
+            return hosts
+        except KeyError:
+            raise HTTPError(page.text)
 
     def get_scored_hosts(self, tc_tuple) -> HostDict:
         """
@@ -421,7 +427,7 @@ class VectraActiveEnforcement(object):
                     # Set a "VAE Blocked" to set the host as being blocked and registed what elements were blocked in separate tags
                     tag_to_set = ['VAE Blocked']
                     if len(host.blocked_elements) < 1:
-                        raise HTTPException('No elements blocked by FW')
+                        raise HTTPError('No elements blocked by FW')
                     for element in host.blocked_elements:
                         tag_to_set.append('VAE ID: {}'.format(element))
                     self.vectra_api_client.set_host_tags(host_id=host_id, tags=tag_to_set, append=True)
@@ -486,10 +492,10 @@ class VectraActiveEnforcement(object):
                     self.logger.error('Error encountered trying to unblock detection ID {}: {}'.format(detection.id, str(e)))
 
 def main():
-    forti_client = fortinet.FortiClient()
+    vm_client = vmware.VMWareClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-            fw_clients = [forti_client], 
+            fw_clients = [vm_client], 
             vectra_api_client = vectra_api_client,
             block_host_tag = BLOCK_HOST_TAG,
             block_host_tc_score = BLOCK_HOST_THREAT_CERTAINTY, 

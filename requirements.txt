@@ -1,2 +1,4 @@
-pyfortiapi==0.2.0
-requests>=2.0
+vat==0.3.3
+requests==2.22.0
+pyVim==3.0.2
+pyVmomi==7.0.2

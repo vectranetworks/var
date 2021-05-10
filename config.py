@@ -1,7 +1,7 @@
 ### GENERAL SETUP
 # Vectra brain API access.
 COGNITO_URL = 'https://demo.vectra.io'
-COGNITO_TOKEN = 'bf9e8f72f8e351c77a1ef03cfaa538d5a8797090'
+COGNITO_TOKEN = 'e8e5431e633f3f5470830fc8050c29356420583e'
 LOG_TO_FILE = False
 LOG_FILE = 'vae.log'
 
@@ -28,5 +28,5 @@ EXTERNAL_BLOCK_HOST_TC = (100, 'and', 100)
 # Tag to block external IPs present in detection; remove the tag to unblock the detection.
 EXTERNAL_BLOCK_DETECTION_TAG = 'block'
 # Detection types for which we will block all external IPs present on those.
-# E.g. "Ransomware File Activity,Shell Knocker"
+# E.g. "External Remote Access, Data Smuggler"
 EXTERNAL_BLOCK_DETECTION_TYPES = []

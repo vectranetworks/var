@@ -40,22 +40,23 @@ class ClearPassClient(ThirdPartyInterface):
         for mac_address in mac_addresses:
             self._patch_endpoint(mac_address, isolated=True)
             self._disconnect_session(mac_address)
-            host.add_blocked_element(mac_address)
-        return host
+        return mac_addresses
 
     def unblock_host(self, host):
-        mac_addresses = host.mac_addresses
+        mac_addresses = host.blocked_elements.get(self.__class__.__name__, [])
         for mac_address in mac_addresses:
             self._patch_endpoint(mac_address, isolated=False)
             self._disconnect_session(mac_address)
-            host.add_blocked_element(mac_address)
-        return host
+        return mac_addresses
     
     def block_detection(self, detection):
-        raise NotImplementedError
+        # this client only implements Host-based blocking
+        self.logger.warn('VMWare client does not implement detection-based blocking')
+        return []
 
     def unblock_detection(self, detection):
-        raise NotImplementedError
+        # this client only implements Host-basd blocking
+        return []
 
     def _patch_endpoint(self, mac_address, isolated=False):
         patch_endpoint_url = "{url}/endpoint/mac-address/{mac_address}".format(url=self.url, mac_address=mac_address)

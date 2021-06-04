@@ -130,19 +130,17 @@ class FortiClient(ThirdPartyInterface):
         for firewall in self.firewalls:
             self.register_address(firewall, ip_address)
             self.update_fortinet_group(firewall, ip_address=ip_address, block_type=BlockType.SOURCE, append=True)
-        host.add_blocked_element(ip_address)
-        return host
+        return [ip_address]
 
     def unblock_host(self, host):
-        ip_addresses = host.blocked_elements
+        ip_addresses = host.blocked_elements.get(self.__class__.__name__, [])
         if len(ip_addresses) < 1:
             self.logger.error('No IP address found for host {}'.format(host.name))
         for ip_address in ip_addresses:
             for firewall in self.firewalls:
                 self.update_fortinet_group(firewall, ip_address=ip_address, block_type=BlockType.SOURCE, append=False)
                 self.unregister_address(firewall, ip_address)
-        host.blocked_elements = []
-        return host
+        return ip_addresses
     
     def block_detection(self, detection):
         ip_addresses = detection.dst_ips
@@ -150,19 +148,17 @@ class FortiClient(ThirdPartyInterface):
             for ip in ip_addresses:
                 self.register_address(firewall, ip)
                 self.update_fortinet_group(firewall, ip_address=ip, block_type=BlockType.DESTINATION, append=True)
-                detection.add_blocked_element(ip)
-        return detection
+        return ip_addresses
 
     def unblock_detection(self, detection):
-        ip_addresses = detection.blocked_elements
+        ip_addresses = detection.blocked_elements.get(self.__class__.__name__, [])
         if len(ip_addresses) < 1:
-            self.logger.error('No IP address found for Detection ID {}'.format(detection.id))
+            self.logger.error('No IP address found for detection ID {}'.format(detection.id))
         for ip_address in ip_addresses:
             for firewall in self.firewalls:
                 self.update_fortinet_group(firewall, ip_address=ip_address, block_type=BlockType.DESTINATION, append=False)
                 self.unregister_address(firewall, ip_address)
-        detection.blocked_elements = []
-        return detection
+        return ip_addresses
 
     def unregister_address(self, firewall, ip_address: str):
         """Register IP with FortiGate if not already registered"""

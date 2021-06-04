@@ -422,14 +422,14 @@ class VectraActiveEnforcement(object):
             for firewall in self.fw_clients:
                 try:
                     # Quarantaine endpoint
-                    host = firewall.block_host(host=host)
-                    self.logger.info('Blocked host {} on firewall'.format(host.name))
+                    blocked_elements = firewall.block_host(host=host)
+                    self.logger.info('Blocked host {id} on client {client}'.format(id=host_id, client=firewall.__class__.__name__))
                     # Set a "VAE Blocked" to set the host as being blocked and registed what elements were blocked in separate tags
                     tag_to_set = ['VAE Blocked']
-                    if len(host.blocked_elements) < 1:
-                        raise HTTPError('No elements blocked by FW')
-                    for element in host.blocked_elements:
-                        tag_to_set.append('VAE ID: {}'.format(element))
+                    if len(blocked_elements) < 1:
+                        self.logger.warning('Did not find any elements to block on host ID {}'.format(host_id))
+                    for element in blocked_elements:
+                        tag_to_set.append('VAE ID:{client_class}:{id}'.format(client_class=firewall.__class__.__name__, id=element))
                     self.vectra_api_client.set_host_tags(host_id=host_id, tags=tag_to_set, append=True)
                     self.vectra_api_client.set_host_note(host_id=host_id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
                     self.logger.debug('Added Tags to host')
@@ -443,14 +443,17 @@ class VectraActiveEnforcement(object):
                 continue
             for firewall in self.fw_clients:
                 try:
-                    host = firewall.unblock_host(host)
-                    self.logger.info('Unquaratained host {}'.format(host.name))
+                    unblocked_elements = firewall.unblock_host(host)
+                    for element in unblocked_elements:
+                        self.logger.debug('Unblocked element {}'.format(element))
+                    self.logger.info('Unquaratained host {id} on client {client}'.format(id=host_id, client=firewall.__class__.__name__))
                     # Remove all tags set by this script from the host.
                     # Sometimes a host can have both a block and unblock tag, we need to correct this. 
                     if 'block' in host.tags:
                         self.logger.warning('Host {} is in no-block list but has a "block" tag. Removing tag..'.format(host['name']))
                         host.tags.remove('block')
                     self.vectra_api_client.set_host_tags(host_id=host_id, tags=host.tags, append=False)
+                    self.vectra_api_client.set_host_note(host_id=host_id, note='Automatically unblocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
                     self.logger.debug('Removed tags')
                 except HTTPException as e:
                     self.logger.error('Error encountered trying to unblock Host ID{}: {}'.format(host.id, str(e)))
@@ -461,14 +464,14 @@ class VectraActiveEnforcement(object):
             for firewall in self.fw_clients:
                 try:
                     # Quarantaine endpoint
-                    detection = firewall.block_detection(detection=detection)
+                    blocked_elements = firewall.block_detection(detection=detection)
                     # Set a "VAE Blocked" to set the detection as being blocked and registed what elements were blocked in separate tags
                     tag_to_set = ['VAE Blocked']
-                    if len(detection.blocked_elements) < 1:
+                    if len(blocked_elements) < 1:
                         self.logger.warning('Did not find any elements to block on detection ID {}'.format(detection.id))
-                    for element in detection.blocked_elements:
-                        tag_to_set.append('VAE ID: {}'.format(element))
-                    self.logger.info('Blocked detection ID {} on firewall'.format(detection.id))
+                    for element in blocked_elements:
+                        tag_to_set.append('VAE ID:{client_class}:{id}'.format(client_class=firewall.__class__.__name__, id=element))
+                    self.logger.info('Blocked detection ID {id} on client {client}'.format(id=detection.id, client=firewall.__class__.__name__))
                     self.vectra_api_client.set_detection_tags(detection_id=detection_id, tags=tag_to_set, append=True)
                     self.vectra_api_client.set_detection_note(detection_id=detection.id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
                     self.logger.debug('Added Tags to detection')
@@ -479,8 +482,10 @@ class VectraActiveEnforcement(object):
         for detection_id, detection in detections_to_unblock.items():
             for firewall in self.fw_clients:
                 try:
-                    detection = firewall.unblock_detection(detection)
-                    self.logger.info('Unquaratained detection ID {}'.format(detection.id))
+                    unblocked_elements = firewall.unblock_detection(detection)
+                    for element in unblocked_elements:
+                        self.logger.debug('Unblocked element {}'.format(element))
+                    self.logger.info('Unquaratained detection ID {id} on {client}'.format(id=detection.id, client=firewall.__class__.__name__))
                     # Remove all tags set by this script from the detection.
                     # Sometimes a detection can have both a block and unblock tag, we need to correct this. 
                     if 'block' in detection.tags:
@@ -492,10 +497,11 @@ class VectraActiveEnforcement(object):
                     self.logger.error('Error encountered trying to unblock detection ID {}: {}'.format(detection.id, str(e)))
 
 def main():
-    vm_client = vmware.VMWareClient()
+    t_client = test_client.TestClient()
+    t_client_bis = test_client.TestClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-            fw_clients = [vm_client], 
+            fw_clients = [t_client, t_client_bis], 
             vectra_api_client = vectra_api_client,
             block_host_tag = BLOCK_HOST_TAG,
             block_host_tc_score = BLOCK_HOST_THREAT_CERTAINTY, 

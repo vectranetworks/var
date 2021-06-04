@@ -1,4 +1,6 @@
 import ipaddress
+import re
+
 
 class VectraHost:
     def __init__(self, host):
@@ -51,10 +53,16 @@ class VectraHost:
         return None
 
     def _get_blocked_elements(self, tags):
-        blocked_elements = []
+        blocked_elements = {}
         for tag in tags:
             if tag.startswith('VAE ID:'):
-                blocked_elements.append(tag[8:])
+                # Tags are in the form "VAE ID:Client:ID"
+                blocking_client = re.findall(':.*?:', tag)[0].replace(':','')
+                id = tag[tag.find(blocking_client)+len(blocking_client)+1:]
+                if blocking_client not in blocked_elements:
+                    blocked_elements[blocking_client] = [id]
+                else:
+                    blocked_elements[blocking_client].append(id)
         return blocked_elements
 
     def _get_external_tags(self, tags):
@@ -63,9 +71,6 @@ class VectraHost:
             if not tag.startswith('VAE ID:') and not tag == 'VAE Blocked':
                 tags_to_keep.append(tag)
         return tags_to_keep
-
-    def add_blocked_element(self, element):
-        self.blocked_elements.append(element)
 
 
 class VectraDetection:
@@ -98,10 +103,16 @@ class VectraDetection:
         return list(dst_domains)
 
     def _get_blocked_elements(self, tags):
-        blocked_elements = []
+        blocked_elements = {}
         for tag in tags:
             if tag.startswith('VAE ID:'):
-                blocked_elements.append(tag[8:])
+                # Tags are in the form "VAE ID:Client:ID"
+                blocking_client = re.findall(':.*?:', tag)[0].replace(':','')
+                id = tag[tag.find(blocking_client)+len(blocking_client)+1:]
+                if blocking_client not in blocked_elements:
+                    blocked_elements[blocking_client] = [id]
+                else:
+                    blocked_elements[blocking_client].append(id)
         return blocked_elements
 
     def _get_external_tags(self, tags):
@@ -110,6 +121,3 @@ class VectraDetection:
             if not tag.startswith('VAE ID:') and not tag == 'VAE Blocked':
                 tags.append(tag)
         return tags
-
-    def add_blocked_element(self, element):
-        self.blocked_elements.append(element)

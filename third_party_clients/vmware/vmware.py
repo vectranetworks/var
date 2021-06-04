@@ -34,36 +34,51 @@ class VMWareClient(ThirdPartyInterface):
         ThirdPartyInterface.__init__ (self)
 
     def block_host(self, host):
-        print(host.vmware_vm_uuid)
-        for host, si in self.vcsa_hosts_service_instances.items():
-            # Get the list of VM objects for each vCenter that could potentially be blocked
+        # We use a mix of instance and BIOS UUID
+        uuid = host.vmware_vm_uuid[:36]
+        # As we don't know the VCSA the host is on, we need to loop
+        vm_pointer = None
+        for vcsa_host, si in self.vcsa_hosts_service_instances.items():
             content = si.RetrieveContent()
             objView = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)
             vmList = objView.view
             objView.Destroy()
             for vm in vmList:
-                print(vm.name)
-        exit()      
-        return host
+                if vm.summary.config.instanceUuid == uuid:
+                    vm_pointer = vm
+                    break # Get out of the loop since we found the object
+            if vm_pointer:
+                self.update_virtual_nic_state(si, vm_pointer, 'disconnect')
+                break # break the parent loop as well
+        return [uuid]
 
     def unblock_host(self, host):
-        ip_addresses = host.blocked_elements
-        if len(ip_addresses) < 1:
-            self.logger.error('No IP address found for host {}'.format(host.name))
-        for ip_address in ip_addresses:
-            for firewall in self.firewalls:
-                self.update_fortinet_group(firewall, ip_address=ip_address, block_type=BlockType.SOURCE, append=False)
-                self.unregister_address(firewall, ip_address)
-        host.blocked_elements = []
-        return host
+        # We use a mix of instance and BIOS UUID. We can use the UUID we have on the host container, not the tag as this in constant.
+        uuid = host.vmware_vm_uuid[:36]
+        # As we don't know the VCSA the host is on, we need to loop
+        vm_pointer = None
+        for vcsa_host, si in self.vcsa_hosts_service_instances.items():
+            content = si.RetrieveContent()
+            objView = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)
+            vmList = objView.view
+            objView.Destroy()
+            for vm in vmList:
+                if vm.summary.config.instanceUuid == uuid:
+                    vm_pointer = vm
+                    break # Get out of the loop since we found the object
+            if vm_pointer:
+                self.update_virtual_nic_state(si, vm_pointer, 'connect')
+                break # break the parent loop as well
+        return [uuid]
     
     def block_detection(self, detection):
-        # this client only implements Host-basd blocking
-        return detection
+        # this client only implements Host-based blocking
+        self.logger.warn('VMWare client does not implement detection-based blocking')
+        return []
 
     def unblock_detection(self, detection):
         # this client only implements Host-basd blocking
-        return detection
+        return []
     
     def wait_for_tasks(self, service_instance, tasks):
         """Given the service instance si and tasks, it returns after all the
@@ -148,5 +163,5 @@ class VMWareClient(ThirdPartyInterface):
             spec = vim.vm.ConfigSpec()
             spec.deviceChange = dev_changes
             task = vm_obj.ReconfigVM_Task(spec=spec)
-            wait_for_tasks(si, [task])
+            self.wait_for_tasks(si, [task])
         return True

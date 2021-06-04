@@ -1,7 +1,7 @@
 ### GENERAL SETUP
 # Vectra brain API access.
 COGNITO_URL = 'https://demo.vectra.io'
-COGNITO_TOKEN = 'e8e5431e633f3f5470830fc8050c29356420583e'
+COGNITO_TOKEN = '070d8c3ef9d310dad630de294af8997a16b01908'
 LOG_TO_FILE = False
 LOG_FILE = 'vae.log'
 

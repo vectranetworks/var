@@ -19,7 +19,7 @@ class ThirdPartyInterface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def block_host(self, host: VectraHost) -> VectraHost:
+    def block_host(self, host: VectraHost) -> list:
         """
         Block a VectraHost instance on the corresponding FW/NAC
         :rtype: list of all elements that were blocked
@@ -27,7 +27,7 @@ class ThirdPartyInterface(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def unblock_host(self, host: VectraHost) -> VectraHost:
+    def unblock_host(self, host: VectraHost) -> list:
         """
         Unlock a VectraHost instance on the corresponding FW/NAC
         :rtype: list of all elements that were unblocked
@@ -35,7 +35,7 @@ class ThirdPartyInterface(metaclass=abc.ABCMeta):
         raise NotImplementedError
     
     @abc.abstractmethod
-    def block_detection(self, detection: VectraDetection) -> VectraDetection:
+    def block_detection(self, detection: VectraDetection) -> list:
         """
         Block a VectraDetection instance on the corresponding FW/NAC
         :rtype: list of all elements that were blocked
@@ -43,7 +43,7 @@ class ThirdPartyInterface(metaclass=abc.ABCMeta):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def unblock_detection(self, detection: VectraDetection) -> VectraDetection:
+    def unblock_detection(self, detection: VectraDetection) -> list:
         """
         Unblock a VectraDetection instance on the corresponding FW/NAC
         :rtype: list of all elements that were unblocked

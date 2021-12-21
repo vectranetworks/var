@@ -9,6 +9,7 @@ from typing import Union, Optional, Dict
 from vectra_active_enforcement_consts import VectraHost, VectraDetection
 from third_party_clients.fortinet import fortinet
 from third_party_clients.vmware import vmware
+from third_party_clients.pan import pan
 from third_party_clients.test_client import test_client
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE,
@@ -498,10 +499,9 @@ class VectraActiveEnforcement(object):
 
 def main():
     t_client = test_client.TestClient()
-    t_client_bis = test_client.TestClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-            fw_clients = [t_client, t_client_bis], 
+            fw_clients = [t_client], 
             vectra_api_client = vectra_api_client,
             block_host_tag = BLOCK_HOST_TAG,
             block_host_tc_score = BLOCK_HOST_THREAT_CERTAINTY, 

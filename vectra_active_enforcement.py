@@ -10,6 +10,7 @@ from vectra_active_enforcement_consts import VectraHost, VectraDetection
 from third_party_clients.fortinet import fortinet
 from third_party_clients.vmware import vmware
 from third_party_clients.pan import pan
+from third_party_clients.cisco_ise import ise
 from third_party_clients.test_client import test_client
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE,
@@ -308,7 +309,7 @@ class VectraClient(vectra.VectraClientV2_2):
 class VectraActiveEnforcement(object):
     
     def __init__(self, 
-            fw_clients: list, 
+            third_party_clients: list, 
             vectra_api_client: VectraClient, 
             block_host_tag: Optional[str],
             block_host_tc_score: tuple, 
@@ -322,7 +323,7 @@ class VectraActiveEnforcement(object):
         ):
         # Generic setup
         self.logger = logging.getLogger()
-        self.fw_clients = fw_clients
+        self.third_party_clients = third_party_clients
         self.vectra_api_client = vectra_api_client
         # Internal (un)blocking variables  
         self.block_host_tag = block_host_tag
@@ -420,17 +421,17 @@ class VectraActiveEnforcement(object):
 
     def block_hosts(self, hosts_to_block):
         for host_id, host in hosts_to_block.items():
-            for firewall in self.fw_clients:
+            for third_party_client in self.third_party_clients:
                 try:
                     # Quarantaine endpoint
-                    blocked_elements = firewall.block_host(host=host)
-                    self.logger.info('Blocked host {id} on client {client}'.format(id=host_id, client=firewall.__class__.__name__))
+                    blocked_elements = third_party_client.block_host(host=host)
+                    self.logger.info('Blocked host {id} on client {client}'.format(id=host_id, client=third_party_client.__class__.__name__))
                     # Set a "VAE Blocked" to set the host as being blocked and registed what elements were blocked in separate tags
                     tag_to_set = ['VAE Blocked']
                     if len(blocked_elements) < 1:
                         self.logger.warning('Did not find any elements to block on host ID {}'.format(host_id))
                     for element in blocked_elements:
-                        tag_to_set.append('VAE ID:{client_class}:{id}'.format(client_class=firewall.__class__.__name__, id=element))
+                        tag_to_set.append('VAE ID:{client_class}:{id}'.format(client_class=third_party_client.__class__.__name__, id=element))
                     self.vectra_api_client.set_host_tags(host_id=host_id, tags=tag_to_set, append=True)
                     self.vectra_api_client.set_host_note(host_id=host_id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
                     self.logger.debug('Added Tags to host')
@@ -442,12 +443,12 @@ class VectraActiveEnforcement(object):
             if len(host.blocked_elements) < 1:
                 self.logger.error('Could not find what was blocked on host {}'.format(host.name))
                 continue
-            for firewall in self.fw_clients:
+            for third_party_client in self.third_party_clients:
                 try:
-                    unblocked_elements = firewall.unblock_host(host)
+                    unblocked_elements = third_party_client.unblock_host(host)
                     for element in unblocked_elements:
                         self.logger.debug('Unblocked element {}'.format(element))
-                    self.logger.info('Unquaratained host {id} on client {client}'.format(id=host_id, client=firewall.__class__.__name__))
+                    self.logger.info('Unquaratained host {id} on client {client}'.format(id=host_id, client=third_party_client.__class__.__name__))
                     # Remove all tags set by this script from the host.
                     # Sometimes a host can have both a block and unblock tag, we need to correct this. 
                     if 'block' in host.tags:
@@ -462,17 +463,17 @@ class VectraActiveEnforcement(object):
 
     def block_detections(self, detections_to_block):
         for detection_id, detection in detections_to_block.items():
-            for firewall in self.fw_clients:
+            for third_party_client in self.third_party_clients:
                 try:
                     # Quarantaine endpoint
-                    blocked_elements = firewall.block_detection(detection=detection)
+                    blocked_elements = third_party_client.block_detection(detection=detection)
                     # Set a "VAE Blocked" to set the detection as being blocked and registed what elements were blocked in separate tags
                     tag_to_set = ['VAE Blocked']
                     if len(blocked_elements) < 1:
                         self.logger.warning('Did not find any elements to block on detection ID {}'.format(detection.id))
                     for element in blocked_elements:
-                        tag_to_set.append('VAE ID:{client_class}:{id}'.format(client_class=firewall.__class__.__name__, id=element))
-                    self.logger.info('Blocked detection ID {id} on client {client}'.format(id=detection.id, client=firewall.__class__.__name__))
+                        tag_to_set.append('VAE ID:{client_class}:{id}'.format(client_class=third_party_client.__class__.__name__, id=element))
+                    self.logger.info('Blocked detection ID {id} on client {client}'.format(id=detection.id, client=third_party_client.__class__.__name__))
                     self.vectra_api_client.set_detection_tags(detection_id=detection_id, tags=tag_to_set, append=True)
                     self.vectra_api_client.set_detection_note(detection_id=detection.id, note='Automatically blocked on {}'.format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
                     self.logger.debug('Added Tags to detection')
@@ -481,12 +482,12 @@ class VectraActiveEnforcement(object):
 
     def unblock_detections(self, detections_to_unblock):
         for detection_id, detection in detections_to_unblock.items():
-            for firewall in self.fw_clients:
+            for third_party_client in self.third_party_clients:
                 try:
-                    unblocked_elements = firewall.unblock_detection(detection)
+                    unblocked_elements = third_party_client.unblock_detection(detection)
                     for element in unblocked_elements:
                         self.logger.debug('Unblocked element {}'.format(element))
-                    self.logger.info('Unquaratained detection ID {id} on {client}'.format(id=detection.id, client=firewall.__class__.__name__))
+                    self.logger.info('Unquaratained detection ID {id} on {client}'.format(id=detection.id, client=third_party_client.__class__.__name__))
                     # Remove all tags set by this script from the detection.
                     # Sometimes a detection can have both a block and unblock tag, we need to correct this. 
                     if 'block' in detection.tags:
@@ -501,7 +502,7 @@ def main():
     t_client = test_client.TestClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-            fw_clients = [t_client], 
+            third_party_clients = [t_client], 
             vectra_api_client = vectra_api_client,
             block_host_tag = BLOCK_HOST_TAG,
             block_host_tc_score = BLOCK_HOST_THREAT_CERTAINTY, 

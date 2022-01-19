@@ -4,7 +4,7 @@ import requests
 import time
 import xmltodict
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.clearpass.ice_config import ISE_APPLIANCE_IP, ISE_USERNAME, ISE_PASSWORD, CHECK_SSL, PORTBOUNCE_POLICY, QUARANTAINE_POLICY 
+from third_party_clients.cisco_ise.ise_config import ISE_APPLIANCE_IP, ISE_USERNAME, ISE_PASSWORD, CHECK_SSL, PORTBOUNCE_POLICY, QUARANTAINE_POLICY 
 
 
 def request_error_handler(func):
@@ -39,7 +39,7 @@ class HTTPException(Exception):
     pass
 
 
-class ICEClient(ThirdPartyInterface):
+class ISEClient(ThirdPartyInterface):
 
     @staticmethod
     def _generate_url_params(param_dict):
@@ -99,7 +99,7 @@ class ICEClient(ThirdPartyInterface):
     
     def block_detection(self, detection):
         # this client only implements Host-based blocking
-        self.logger.warn('ICE client does not implement detection-based blocking')
+        self.logger.warn('ISE client does not implement detection-based blocking')
         return []
 
     def unblock_detection(self, detection):
@@ -137,7 +137,7 @@ class ICEClient(ThirdPartyInterface):
                     },
                     {
                         'name': 'policyName',
-                        'value': 'Quarantine'
+                        'value': self.quarantine_policy
                     }
                 ]
             }

@@ -4,7 +4,7 @@ import requests
 from requests import HTTPError
 from enum import Enum, unique, auto
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.fortinet.fortinet_config import INTERNAL_BLOCK_POLICY, EXTERNAL_BLOCK_POLICY, FIREWALLS
+from third_party_clients.fortinet.fortinet_config import INTERNAL_ADDRESS_GROUP, EXTERNAL_ADDRESS_GROUP, FIREWALLS
 
 @unique
 class BlockType(Enum):
@@ -113,8 +113,8 @@ class FortiGate:
 class FortiClient(ThirdPartyInterface):
     def __init__(self):
         self.logger = logging.getLogger()
-        self.internal_block_policy_name = INTERNAL_BLOCK_POLICY
-        self.external_block_policy_name = EXTERNAL_BLOCK_POLICY
+        self.internal_block_policy_name = INTERNAL_ADDRESS_GROUP
+        self.external_block_policy_name = EXTERNAL_ADDRESS_GROUP
         try:
             self.firewalls = []
             for auth in FIREWALLS:

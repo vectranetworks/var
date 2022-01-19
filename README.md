@@ -26,6 +26,21 @@ Integration-specific documentation can be found in the [relevant folders](./thir
 
 The script supports both host based blocking, and detection based blocking. Parameters defining what detections/host get blocked are defined in the [config.py](./config.py) file.
 
+
+# Getting a Vectra API token. 
+
+You will need to provide a Vectra API token within the [config.py](./config.py) file. To create a token, login into Vectra, go to "My Profile" and click to create an API token. 
+
+Vectra API tokens will be linked ot the user that created them, and inherit the rights of that user. Any actions done using that API token will also show under the same username in the audit logs. 
+
+YOu may want to create a separate user for the API integration for audit purposes, and only give it fine-grained RBAC rights. For the integration to work, the user will need:
+* Read access to Hosts
+* Read access to Detections
+* Read access to "Manage - Groups"
+* Read/Write access to tags
+* Read/Write access to Notes & Other User's Notes
+
+
 ## Host-based blocking
 
 The goal of host-based blocking is identyfying internal host who need to be prevented from being able to further communicate internally and/or externally. The blocking will happen on host psecific attributes, such as for instance the internal IP address, the MAC address or the hostname. 

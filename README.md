@@ -7,6 +7,7 @@ The code defines an [abstract class](./third_party_clients/third_party_interface
 
 Since adding a new third party integration only requires to extend that class, I'd encourage to use this framework for any new integrations being built. 
 
+
 # Third party integrations
 
 Currently, the following third party integrations are implemented: 
@@ -18,17 +19,18 @@ Currently, the following third party integrations are implemented:
 6. VMWare vSphere
 7. Windows (direct PowerShell commands to shutdown host)
 
-Integration-specific documentation can be found in the relevant repositories. 
+Integration-specific documentation can be found in the [relevant folders](./third_party_clients/) of the third party integrations. 
+
 
 # Workflow
 
-The script supports both host based blocking, and detection based blocking. Parameters defining what detections/host get blocked are defined in the _config.py_ file.
+The script supports both host based blocking, and detection based blocking. Parameters defining what detections/host get blocked are defined in the [config.py](./config.py) file.
 
 ## Host-based blocking
 
 The goal of host-based blocking is identyfying internal host who need to be prevented from being able to further communicate internally and/or externally. The blocking will happen on host psecific attributes, such as for instance the internal IP address, the MAC address or the hostname. 
 
-There are mutliple parameters within the _config.py_ file which define how hosts are bein selected for blocking:
+There are mutliple parameters within the [config.py](./config.py) file which define how hosts are bein selected for blocking:
 
 1. BLOCK_HOST_TAG: defines a tag that when set on a host will cause that host to be blocked.
 2. BLOCK_HOST_GROUP_NAME: defines a group name, where all members of that group will be blocked. That group need to be created manually on the Cognito UI, it will not be created by the script. 
@@ -47,11 +49,12 @@ Most internal-focused third party clients, such as NACs or endpoints will not im
 
 Since this usually will block the IP/domain for the whoel environment, **extreme care is advised**, as in the case of false-positives it can have a large impact on the network. 
 
-There are mutliple parameters within the _config.py_ file which define how detections are bein selected for blocking:
+There are mutliple parameters within the [config.py](./config.py) file which define how detections are bein selected for blocking:
 
 1. EXTERNAL_BLOCK_HOST_TC: defines host threat/certainty score above which all detections present on that host will get marked for blocking (or at least any external component present in those detections). 
 2. EXTERNAL_BLOCK_DETECTION_TAG: defines a tag that when set on a detection will cause all external components of that detection to be blocked. 
 3. EXTERNAL_BLOCK_DETECTION_TYPES: this is a list containing specific detection types, which will always have their external components automatically blocked. Any valid detection type will be accepted by the script, but it only makes sense for detections with an external component, thus Botnet, Command&Control or Exfil detections. 
+
 
 # Configuring the Third-Party clients used
 
@@ -79,13 +82,13 @@ This is done in the instantiation call of the _VectraActiveEnforcement()_ class.
 If for example we want to instantiate a PAN client and a VMWare clients, it would look like follows:
 
 ```python
-    # Instantiate the clients here
-    pan_client = pan.PANClient()
-    vmware_client = vmware.VMWareClient()
-    vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
-    vae = VectraActiveEnforcement(
-            third_party_clients = [pan_client, vmware_client], # Add the clients to this list 
-            vectra_api_client = vectra_api_client,
+# Instantiate the clients here
+pan_client = pan.PANClient()
+vmware_client = vmware.VMWareClient()
+vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+vae = VectraActiveEnforcement(
+        third_party_clients = [pan_client, vmware_client], # Add the clients to this list 
+        vectra_api_client = vectra_api_client,
 ```
 
 ## Selecting what block types to run
@@ -95,14 +98,14 @@ Users can also configure if they want to run only host-based blocking, detection
 If one type is not desired, you can comment out the corresponding code blocks:
 
 ```python
-    # Those 3 lines handle host-based blocking; comment them out if you don't want it
-    hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
-    vae.block_hosts(hosts_to_block)
-    vae.unblock_hosts(hosts_to_unblock)
+# Those 3 lines handle host-based blocking; comment them out if you don't want it
+hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
+vae.block_hosts(hosts_to_block)
+vae.unblock_hosts(hosts_to_unblock)
 
-    # Those 3 lines handle detection-based blocking; comment them out if you don't want it
-    detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
-    vae.block_detections(detections_to_block)
-    vae.unblock_detections(detections_to_unblock)
+# Those 3 lines handle detection-based blocking; comment them out if you don't want it
+detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
+vae.block_detections(detections_to_block)
+vae.unblock_detections(detections_to_unblock)
 ```
 

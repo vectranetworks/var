@@ -1,0 +1,3 @@
+HOSTNAME = "10.10.10.10"
+CHECK_SSL = False
+API_KEY="Put API Key Here"

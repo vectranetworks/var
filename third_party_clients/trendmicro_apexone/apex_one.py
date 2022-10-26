@@ -10,7 +10,7 @@ import requests
 from requests import HTTPError
 from enum import Enum, unique, auto
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.trendmicro.trendmicro_config import BASE_URL, APPLICATION_ID, API_KEY, API_PATH
+from third_party_clients.trendmicro_apexone.trendmicro_config import BASE_URL, APPLICATION_ID, API_KEY, API_PATH
 
 
 class TrendMicroClient(ThirdPartyInterface):
@@ -21,6 +21,7 @@ class TrendMicroClient(ThirdPartyInterface):
 
     def block_host(self, host):
         mac_addresses = host.mac_addresses
+        mac_addresses = [mac.replace(':', '-') for mac in mac_addresses]
         ip_address = host.ip
         if len(mac_addresses) < 1:
             # No MAC Address found, block IP
@@ -35,6 +36,7 @@ class TrendMicroClient(ThirdPartyInterface):
 
     def unblock_host(self, host):
         mac_addresses = host.mac_addresses
+        mac_addresses = [mac.replace(':', '-') for mac in mac_addresses]
         ip_address = host.ip
         if len(mac_addresses) < 1:
             # No MAC Address found, block IP

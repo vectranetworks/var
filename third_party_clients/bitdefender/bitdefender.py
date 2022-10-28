@@ -18,11 +18,11 @@ class BitdefenderClient(ThirdPartyInterface):
 
         login_string = self.apiKey + ":"
         encoded_bytes = base64.b64encode(login_string.encode())
-        encoded_user_pass_sequence = str(encoded_bytes,'utf-8')
+        encoded_user_pass_sequence = str(encoded_bytes, 'utf-8')
         self.authorization_header = "Basic " + encoded_user_pass_sequence
 
         # Instantiate parent class
-        ThirdPartyInterface.__init__ (self)
+        ThirdPartyInterface.__init__(self)
 
     def block_host(self, host):
         mac_addresses = host.mac_addresses

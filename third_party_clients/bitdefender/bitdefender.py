@@ -16,10 +16,10 @@ class BitdefenderClient(ThirdPartyInterface):
         self.url = "https://" + HOSTNAME + "/api/v1.0/jsonrpc"
         self.verify = CHECK_SSL
 
-        loginString = self.apiKey + ":"
-        encodedBytes = base64.b64encode(loginString.encode())
-        encodedUserPassSequence = str(encodedBytes,'utf-8')
-        self.authorizationHeader = "Basic " + encodedUserPassSequence
+        login_string = self.apiKey + ":"
+        encoded_bytes = base64.b64encode(login_string.encode())
+        encoded_user_pass_sequence = str(encoded_bytes,'utf-8')
+        self.authorization_header = "Basic " + encoded_user_pass_sequence
 
         # Instantiate parent class
         ThirdPartyInterface.__init__ (self)
@@ -27,15 +27,15 @@ class BitdefenderClient(ThirdPartyInterface):
     def block_host(self, host):
         mac_addresses = host.mac_addresses
         for mac_address in mac_addresses:
-            endpointId = self._get_endpoint_id(mac_address)
-            self._isolate_endpoint(endpointId)
+            endpoint_id = self._get_endpoint_id(mac_address)
+            self._isolate_endpoint(endpoint_id)
         return mac_addresses
 
     def unblock_host(self, host):
         mac_addresses = host.blocked_elements.get(self.__class__.__name__, [])
         for mac_address in mac_addresses:
-            endpointId = self._get_endpoint_id(mac_address)
-            self._restore_endpoint(endpointId)
+            endpoint_id = self._get_endpoint_id(mac_address)
+            self._restore_endpoint(endpoint_id)
         return mac_addresses
 
     def block_detection(self, detection):
@@ -55,39 +55,40 @@ class BitdefenderClient(ThirdPartyInterface):
             "{url}/network".format(url=self.url),
             data=request,
             verify=self.verify,
-            headers = {
+            headers={
                 "Content-Type": "application/json",
-                "Authorization": self.authorizationHeader
+                "Authorization": self.authorization_header
             })
-        jsonResponse = result.json()
-        return jsonResponse["result"]["items"]["id"]
+        json_response = result.json()
+        return json_response["result"]["items"]["id"]
 
-    def _isolate_endpoint(self, endpointId):
-        request = '{"params": {"endpointId" : '+endpointId+'},"jsonrpc": "2.0","method": "createIsolateEndpointTask","id": "0df7568c-59c1-48e0-a31b-18d83e6d9810"}'
+    def _isolate_endpoint(self, endpoint_id):
+        request = '{"params": {"endpoint_id" : '+endpoint_id+'},"jsonrpc": "2.0","method": "createIsolateEndpointTask","id": "0df7568c-59c1-48e0-a31b-18d83e6d9810"}'
 
         result = requests.post(
             "{url}/incidents".format(url=self.url),
             data=request,
             verify=self.verify,
-            headers = {
+            headers={
                 "Content-Type": "application/json",
-                "Authorization": self.authorizationHeader
+                "Authorization": self.authorization_header
             })
 
-        jsonResponse = result.json()
-        return jsonResponse["result"]
+        json_response = result.json()
+        return json_response["result"]
 
-    def _restore_endpoint(self, endpointId):
-        request = '{"params": {"endpointId" : '+endpointId+'},"jsonrpc": "2.0","method": "createRestoreEndpointFromIsolationTask","id": "0df7568c-59c1-48e0-a31b-18d83e6d9810"}'
+    def _restore_endpoint(self, endpoint_id):
+        request = '{"params": {"endpoint_id" : ' + endpoint_id + '},"jsonrpc": "2.0","method": "createRestoreEndpointFromIsolationTask","id": "0df7568c-59c1-48e0-a31b-18d83e6d9810"}'
 
         result = requests.post(
             "{url}/incidents".format(url=self.url),
             data=request,
             verify=self.verify,
-            headers = {
+            headers={
                 "Content-Type": "application/json",
-                "Authorization": self.authorizationHeader
+                "Authorization": self.authorization_header
                 })
 
-            jsonResponse = result.json()
-            return jsonResponse["result"]
+        json_response = result.json()
+        return json_response["result"]
+

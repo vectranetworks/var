@@ -10,7 +10,7 @@ import requests
 from requests import HTTPError
 from enum import Enum, unique, auto
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.trendmicro_apexone.trendmicro_config import BASE_URL, APPLICATION_ID, API_KEY, API_PATH
+from third_party_clients.trendmicro_apexone.apex_one_config import BASE_URL, APPLICATION_ID, API_KEY, API_PATH
 
 
 class TrendMicroClient(ThirdPartyInterface):

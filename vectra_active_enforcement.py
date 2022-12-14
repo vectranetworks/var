@@ -1,4 +1,5 @@
 import logging
+import keyring
 import requests
 import logging
 import ipaddress
@@ -11,8 +12,11 @@ from third_party_clients.fortinet import fortinet
 from third_party_clients.vmware import vmware
 from third_party_clients.pan import pan
 from third_party_clients.cisco_ise import ise
-from third_party_clients.trendmicro import trendmicro
+from third_party_clients.trendmicro_apexone import apex_one
 from third_party_clients.test_client import test_client
+from third_party_clients.pulse_nac import pulse_nac
+from third_party_clients.bitdefender import bitdefender
+from third_party_clients.meraki import meraki
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE,
                     NO_BLOCK_HOST_GROUP_NAME, BLOCK_HOST_THREAT_CERTAINTY, BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
@@ -28,9 +32,9 @@ DetectionDict = Dict[str, VectraDetection]
 
 if LOG_TO_FILE:
     logging.basicConfig(filename=LOG_FILE, format='%(asctime)s %(message)s',
-                        encoding='utf-8', level=logging.INFO)
+                        encoding='utf-8', level=logging.DEBUG)
 else:
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
 
 class HTTPException(Exception):
@@ -566,9 +570,13 @@ class VectraActiveEnforcement(object):
 
 def main():
     t_client = test_client.TestClient()
+    # pulse_nac_client = pulse_nac.PulseNACClient()
+    # ise_client = ise.ISEClient()
+    # bitdefender_client = bitdefender.BitdefenderClient()
+    meraki_client = meraki.MerakiClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-        third_party_clients=[t_client],
+        third_party_clients=[meraki_client],
         vectra_api_client=vectra_api_client,
         block_host_tag=BLOCK_HOST_TAG,
         block_host_tc_score=BLOCK_HOST_THREAT_CERTAINTY,

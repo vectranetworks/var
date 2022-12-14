@@ -4,7 +4,23 @@ import requests
 import time
 import xmltodict
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.cisco_ise.ise_config import ISE_APPLIANCE_IP, ISE_USERNAME, ISE_PASSWORD, CHECK_SSL, PORTBOUNCE_POLICY, QUARANTAINE_POLICY 
+from third_party_clients.cisco_ise.ise_config import ISE_APPLIANCE_IP, ISE_USERNAME, ISE_PASSWORD, CHECK_SSL, \
+    PORTBOUNCE_POLICY, QUARANTAINE_POLICY, ENHANCED
+
+
+def fetch_csrf(func):
+    def _fetch_csrf(self, *args, **kwargs):
+        if ENHANCED:
+            headers = {**self.headers, **{'X-CSRF-TOKEN': 'fetch'}}
+            print(f'args: {args}')
+            print(f'kwargs: {kwargs}')
+            result = requests.get('https://{}:9060/ers/config/ancendpoint/versioninfo'.format(
+                self.url), auth=self.auth, headers=headers, verify=self.verify)
+            kwargs = {'headers': {'csrf': result.headers['X-CSRF-Token']}, 'cookies': result.cookies}
+            return func(**kwargs)
+        else:
+            return func()
+    return _fetch_csrf
 
 
 def request_error_handler(func):
@@ -122,7 +138,8 @@ class ISEClient(ThirdPartyInterface):
         self._add_mac_to_policy(mac_address, self.quarantine_policy)
 
     @request_error_handler
-    def _unquarantaine_endpoint(self, mac_address):
+    @fetch_csrf
+    def _unquarantaine_endpoint(self, mac_address, **kwargs):
         """
         Remove and endpoint from the Quarantaine policy based on its MAC address
         :param mac_address: MAC address of the endpoint to unquarantaine - required
@@ -144,10 +161,15 @@ class ISEClient(ThirdPartyInterface):
         }
 
         return requests.put('https://{url}:9060/ers/config/ancendpoint/clear'.format(url=self.url),
-            auth=self.auth, headers=self.headers, json=payload, verify=self.verify)
+                            auth=self.auth,
+                            headers={**self.headers, **kwargs['headers']['csrf']} if kwargs['headers']['csrf'] else
+                            self.headers,
+                            json=payload, verify=self.verify,
+                            cookies=kwargs['cookies'] if kwargs['cookies'] else None)
 
     @request_error_handler
-    def _add_mac_to_policy(self, mac_address, policy_name):
+    @fetch_csrf
+    def _add_mac_to_policy(self, mac_address, policy_name, **kwargs):
         """
         Put an endpoint in a temporary policy based on its MAC address
         :param mac_address: the MAC address of the endpoint - required
@@ -170,15 +192,24 @@ class ISEClient(ThirdPartyInterface):
         }
 
         return requests.put('https://{url}:9060/ers/config/ancendpoint/apply'.format(url=self.url),
-            auth=self.auth, headers=self.headers, json=payload, verify=self.verify)
+                            auth=self.auth,
+                            headers={**self.headers, **kwargs['headers']['csrf']} if kwargs['headers']['csrf'] else
+                            self.headers,
+                            json=payload, verify=self.verify,
+                            cookies=kwargs['cookies'] if kwargs['cookies'] else None)
 
-    def _get_mac_from_ip(self, ip_address):
+    @fetch_csrf
+    def _get_mac_from_ip(self, ip_address, **kwargs):
         """
         Get the MAC address of an endpoint base on its last IP
         :param ip_address: IP Adress to get the MAC address for
         :rtype: string
         """
-        r = requests.get('https://{url}/admin/API/mnt/Session/EndPointIPAddress/{ip}'.format(url=self.url, ip=ip_address), auth=self.auth, verify=False)
+        r = requests.get('https://{url}/admin/API/mnt/Session/EndPointIPAddress/{ip}'.format(url=self.url, ip=ip_address),
+                         auth=self.auth, verify=False,
+                         headers={**self.headers, **kwargs['headers']['csrf']} if kwargs['headers']['csrf'] else
+                         self.headers,
+                         cookies=kwargs['cookies'] if kwargs['cookies'] else None)
         if r.status_code not in [200, 201, 202, 203, 204]:
             raise HTTPException('No Session on ISE for IP {}'.format(ip_address))
         else:

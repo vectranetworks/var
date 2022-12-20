@@ -1,7 +1,9 @@
 import logging
+import time
 import keyring
 import requests
 import logging
+import sys
 import ipaddress
 import vat.vectra as vectra
 from datetime import datetime
@@ -18,7 +20,7 @@ from third_party_clients.pulse_nac import pulse_nac
 from third_party_clients.bitdefender import bitdefender
 from third_party_clients.meraki import meraki
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE,
+from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE, SLEEP_MINUTES,
                     NO_BLOCK_HOST_GROUP_NAME, BLOCK_HOST_THREAT_CERTAINTY, BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
                     BLOCK_HOST_DETECTION_TYPES, EXTERNAL_BLOCK_HOST_TC, EXTERNAL_BLOCK_DETECTION_TAG,
                     BLOCK_HOST_GROUP_NAME, EXTERNAL_BLOCK_DETECTION_TYPES)
@@ -572,11 +574,11 @@ def main():
     t_client = test_client.TestClient()
     # pulse_nac_client = pulse_nac.PulseNACClient()
     # ise_client = ise.ISEClient()
-    # bitdefender_client = bitdefender.BitdefenderClient()
-    meraki_client = meraki.MerakiClient()
+    bitdefender_client = bitdefender.BitdefenderClient()
+    # meraki_client = meraki.MerakiClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
     vae = VectraActiveEnforcement(
-        third_party_clients=[meraki_client],
+        third_party_clients=[bitdefender_client],
         vectra_api_client=vectra_api_client,
         block_host_tag=BLOCK_HOST_TAG,
         block_host_tc_score=BLOCK_HOST_THREAT_CERTAINTY,
@@ -589,15 +591,23 @@ def main():
         external_block_detection_tag=EXTERNAL_BLOCK_DETECTION_TAG,
     )
 
-    hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
-    vae.block_hosts(hosts_to_block)
-    vae.unblock_hosts(hosts_to_unblock)
+    def take_action():
+        hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
+        vae.block_hosts(hosts_to_block)
+        vae.unblock_hosts(hosts_to_unblock)
 
-    detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
-    vae.block_detections(detections_to_block)
-    vae.unblock_detections(detections_to_unblock)
+        detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
+        vae.block_detections(detections_to_block)
+        vae.unblock_detections(detections_to_unblock)
 
-    logging.info('Run finished\n\n\n')
+        logging.info('Run finished\n\n\n')
+
+    if len(sys.argv) > 1 and sys.argv[1] == '-l':
+        while True:
+            take_action()
+            time.sleep(60 * SLEEP_MINUTES)
+    else:
+        take_action()
 
 
 if __name__ == '__main__':

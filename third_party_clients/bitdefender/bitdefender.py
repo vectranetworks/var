@@ -2,6 +2,7 @@ import logging
 import json
 import requests
 import base64
+import time
 from cachetools import cached, TTLCache
 from third_party_clients.third_party_interface import ThirdPartyInterface
 from third_party_clients.bitdefender.bitdefender_config import HOSTNAME, CHECK_SSL, API_KEY, BLOCK_MULTIPLE
@@ -43,11 +44,19 @@ class BitdefenderClient(ThirdPartyInterface):
                     result = self._isolate_endpoint(endpoint)
                     if not result:
                         self.logger.info('Unable to Quarantine endpoint:{}'.format(endpoint))
+                    elif 'error' in result.keys():
+                        self.logger.info('Unable to quarantined endpoint:{} with response:{}'.format(endpoint, result))
+                    else:
+                        self.logger.debug('Quarantined endpoint:{} with response:{}'.format(endpoint, result))
         elif len(endpoint_ids) == 1:
             self.logger.info('Quarantining endpoint:{}'.format(endpoint_ids[0]))
             result = self._isolate_endpoint(endpoint_ids[0])
             if not result:
                 self.logger.info('Unable to Quarantine endpoint:{}'.format(endpoint_ids[0]))
+            elif 'error' in result.keys():
+                self.logger.debug('Unable to quarantined endpoint:{} with response:{}'.format(endpoint_ids, result))
+            else:
+                self.logger.debug('Quarantined endpoint:{} with response:{}'.format(endpoint_ids[0], result))
         else:
             self.logger.info('Not configured to block multiple endpoints or no endpoint found for host{}. {}'.format(
                 host.name, endpoint_ids))
@@ -61,6 +70,8 @@ class BitdefenderClient(ThirdPartyInterface):
                 result = self._restore_endpoint(endpoint_id)
                 if not result:
                     self.logger.info('Unable to unquarantine endpoint:{},{}'.format(host.name, endpoint_id))
+                elif 'error' in result.keys():
+                    self.logger.info('Unable to unquarantined endpoint:{} with response:{}'.format(endpoint_id, result))
             else:
                 self.logger.info('No proper endpoint id supplied:{}'.format(endpoint_ids))
         return endpoint_ids
@@ -236,73 +247,20 @@ class BitdefenderClient(ThirdPartyInterface):
             fp.write(json.dumps({'endpoints': endpoints, 'inventory': inventory}))
         return {'endpoints': endpoints, 'inventory': inventory}
 
-
-    # def _get_endpoint_id(self, mac_address):
-    #     # Try getEndpointsList
-    #     # https://www.bitdefender.com/business/support/en/77209-128483-getendpointslist.html
-    #     request = {"params": {"parentId": self.company_id,
-    #                           "filters": {"details": {"macs": [mac_address.replace(':', '')]}}},
-    #                "jsonrpc": "2.0", "method": "getEndpointsList", "id": "301f7b05-ec02-481b-9ed6-c07b97de2b7b"}
-    #     result = requests.post(
-    #         "{url}/network".format(url=self.url),
-    #         data=json.dumps(request),
-    #         verify=self.verify,
-    #         headers=self.authorization_header)
-    #     json_response = result.json()
-    #     if json_response["result"].get('items'):
-    #         if len(json_response["result"].get('items')) == 1:
-    #             return json_response["result"]["items"][0]["id"]
-    #         else:
-    #             self.logger.info('More than 1 client found for MAC: {}'.format(mac_address))
-    #             return None
-    #     else:
-    #         # Try getnetworkInventoryItems
-    #         # https://www.bitdefender.com/business/support/en/77209-128494-getnetworkinventoryitems.html
-    #         request = {
-    #             "params": {
-    #                 "parentId": self.company_id,
-    #                 "page": 1,
-    #                 "perPage": 1,
-    #                 "filters": {
-    #                     "details": {"macs": [mac_address.replace(':', '')]},
-    #                     "type": {
-    #                         "computers": True
-    #                     },
-    #                     "depth": {
-    #                         "allItemsRecursively": True
-    #                     }
-    #                 },
-    #                 "options": {
-    #                     "companies": {
-    #                         "returnAllProducts": True
-    #                     }
-    #                 }
-    #             },
-    #             "jsonrpc": "2.0",
-    #             "method": "getNetworkInventoryItems",
-    #             "id": "301f7b05-ec02-481b-9ed6-c07b97de2b7b"
-    #         }
-    #         result = requests.post(
-    #             "{url}/network".format(url=self.url),
-    #             data=json.dumps(request),
-    #             verify=self.verify,
-    #             headers=self.authorization_header)
-    #         json_response = result.json()
-    #         self.logger.debug('json_response:{}'.format(json_response))
-    #         if json_response["result"].get('items'):
-    #             if len(json_response['result'].get('items')) == 1:
-    #                 return json_response["result"]["items"][0]["id"]
-    #         else:
-    #             self.logger.info('More than 1 client found for MAC: {}'.format(mac_address))
-    #             return None
-
     def _isolate_endpoint(self, endpoint_id):
-        request = {"params": {"endpoint_id": endpoint_id}, "jsonrpc": "2.0", "method": "createIsolateEndpointTask",
-                   "id": "0df7568c-59c1-48e0-a31b-18d83e6d9810"}
-
+        request = {
+            "id": "0df7568c-59c1-48e0-a31b-18d83e6d9810",
+            "jsonrpc": "2.0",
+            "method": "createIsolateEndpointTask",
+            "params": {
+                "endpointId": endpoint_id
+            }
+        }
+        # self.logger.debug('\nBody:{}\n'.format(request))
+        # self.logger.debug('Headers:{}\n'.format(self.authorization_header))
         result = requests.post(
             "{url}/incidents".format(url=self.url),
-            data=json.dumps(request),
+            json=request,
             verify=self.verify,
             headers=self.authorization_header)
 
@@ -310,12 +268,18 @@ class BitdefenderClient(ThirdPartyInterface):
         return json_response
 
     def _restore_endpoint(self, endpoint_id):
-        request = {"params": {"endpoint_id": endpoint_id}, "jsonrpc": "2.0",
-                   "method": "createRestoreEndpointFromIsolationTask", "id": "0df7568c-59c1-48e0-a31b-18d83e6d9810"}
+        request = {
+            "id": "0df7568c-59c1-48e0-a31b-18d83e6d9810",
+            "jsonrpc": "2.0",
+            "method": "createRestoreEndpointFromIsolationTask",
+            "params": {
+                "endpointId": endpoint_id
+            }
+        }
 
         result = requests.post(
             "{url}/incidents".format(url=self.url),
-            data=json.dumps(request),
+            json=request,
             verify=self.verify,
             headers=self.authorization_header)
 

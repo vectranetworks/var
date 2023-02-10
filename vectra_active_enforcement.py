@@ -3,8 +3,8 @@ import time
 import keyring
 import requests
 import logging
-import sys
 import ipaddress
+import argparse
 import vat.vectra as vectra
 from datetime import datetime
 from requests import HTTPError
@@ -572,13 +572,34 @@ class VectraActiveEnforcement(object):
 
 
 def main():
+    def obtain_args():
+        parser = argparse.ArgumentParser(description='Vectra Active Enforcement Framework ',
+                                         prefix_chars='--', formatter_class=argparse.RawTextHelpFormatter,
+                                         epilog='')
+        parser.add_argument('--loop', default=False, action='store_true', help='Run in loop.  '
+                                                                             'Required when ran as service.')
+        parser.add_argument('--keyring', default=False, action='store_true', help='Utilize system\'s keyring for'
+                                                                                'sensitive API keys.')
+        return parser.parse_args()
+
+    args = obtain_args()
+
+    # define required clients
     t_client = test_client.TestClient()
     # pulse_nac_client = pulse_nac.PulseNACClient()
     # ise_client = ise.ISEClient()
     # bitdefender_client = bitdefender.BitdefenderClient()
     # amp_client = amp.AMPClient
+<<<<<<< HEAD
+    meraki_client = meraki.MerakiClient(use_keyring=args.keyring)
+    if args.keyring:
+        vectra_api_client = VectraClient(url=COGNITO_URL, token=keyring.get_password('VAE', 'Detect'))
+    else:
+        vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+=======
     # meraki_client = meraki.MerakiClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+>>>>>>> 045bb7fca740a65fef2b6cb76365dd59fe96138a
     vae = VectraActiveEnforcement(
         third_party_clients=[t_client],
         vectra_api_client=vectra_api_client,
@@ -604,7 +625,7 @@ def main():
 
         logging.info('Run finished\n\n\n')
 
-    if len(sys.argv) > 1 and sys.argv[1] == '-l':
+    if args.loop:
         while True:
             take_action()
             time.sleep(60 * SLEEP_MINUTES)

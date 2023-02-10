@@ -590,16 +590,13 @@ def main():
     # ise_client = ise.ISEClient()
     # bitdefender_client = bitdefender.BitdefenderClient()
     # amp_client = amp.AMPClient
-<<<<<<< HEAD
     meraki_client = meraki.MerakiClient(use_keyring=args.keyring)
     if args.keyring:
         vectra_api_client = VectraClient(url=COGNITO_URL, token=keyring.get_password('VAE', 'Detect'))
     else:
         vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
-=======
     # meraki_client = meraki.MerakiClient()
     vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
->>>>>>> 045bb7fca740a65fef2b6cb76365dd59fe96138a
     vae = VectraActiveEnforcement(
         third_party_clients=[t_client],
         vectra_api_client=vectra_api_client,

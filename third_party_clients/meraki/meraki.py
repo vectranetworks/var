@@ -4,7 +4,7 @@ import urllib3
 import json
 import keyring
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.meraki.meraki_config import MERAKI_URL, VERIFY
+from third_party_clients.meraki.meraki_config import MERAKI_URL, API_KEY, BLOCK_GROUP_POLICY, VERIFY
 
 urllib3.disable_warnings()
 
@@ -27,13 +27,17 @@ class MerakiClient(ThirdPartyInterface):
             logger.error('Unable to retrieve organizations for Meraki API.  Error message:{}'.format(results.reason))
             return []
 
-    def __init__(self):
+    def __init__(self, use_keyring):
         self.urlbase = MERAKI_URL.strip('/')
-        self.token = keyring.get_password('VAE', 'Meraki')
+        if use_keyring:
+            self.token = API_KEY
+        else:
+            self.token = keyring.get_password('VAE', 'Meraki')
         self.headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + self.token}
         self.logger = logging.getLogger()
         self.verify = VERIFY
         self.orgs = self.get_orgs(self.urlbase, self.headers, self.verify, self.logger)
+        self.block_policy = BLOCK_GROUP_POLICY if bool(BLOCK_GROUP_POLICY) else 'Blocked'
         # Instantiate parent class
         ThirdPartyInterface.__init__(self)
 
@@ -44,15 +48,27 @@ class MerakiClient(ThirdPartyInterface):
         client_list = self._get_client_id(host.ip, host.mac_addresses)
         if len(client_list) < 1:
             self.logger.info('Unable to find client ID for:{}:{}, not blocking.'.format(host.ip, host.mac_addresses))
+            return []
         if len(client_list) > 1:
             self.logger.info('More than 1 client found for:{}:{}, not blocking.'.format(host.ip, host.mac_addresses))
+            return []
         if len(client_list) == 1:
             self.logger.info('1 client found for:{}:{}, blocking.'.format(host.ip, client_list[0]['id']))
+            # Get policy to store for unblocking request
+            client_policy = self._get_client_policy(client_list[0]['net_id'], client_list[0]['id'])
+            if client_policy.ok:
+                policy_obj = client_policy.json()
+                self.logger.debug('Retrieved clients current policy object: {}'.format(policy_obj))
+            else:
+                # Unable to retrieve policy object
+                self.logger.error('Unable to retrieve policy object for client: {}'.format(client_list[0]['id']))
+                return []
+            # attempt to block
             res = self._block_client(client_list[0])
             if res.ok:
                 self.logger.info('Client {} with ID {} successfully blocked.'.format(client_list[0]['description'],
                                                                                      client_list[0]['id']))
-                return ['{}:{}'.format(client_list[0]['id'], client_list[0]['net_id'])]
+                return ['{}:{}:{}'.format(client_list[0]['id'], client_list[0]['net_id'], policy_obj['devicePolicy'])]
             else:
                 self.logger.info('Error blocking client.  Error message: {}.'.format(res.reason))
                 return []
@@ -62,16 +78,17 @@ class MerakiClient(ThirdPartyInterface):
         self.logger.debug('client_network:{}'.format(client_network))
         client_id = client_network[0].split(':')[0]
         network_id = client_network[0].split(':')[1]
-        self.logger.debug('Meraki host unblock request for host:{} client:{}, network:{}'.format(
-            host.name, client_id, network_id))
-        res = self._unblock_client(client_id, network_id)
+        device_policy = client_network[0].split(':')[2]
+        self.logger.debug('Meraki host unblock request for host:{} client:{}, network:{}, policy:{}'.format(
+            host.name, client_id, network_id, device_policy))
+        res = self._unblock_client(client_id, network_id, device_policy)
         if res.ok:
-            self.logger.debug('Meraki host unblock request successful for host:{} client:{}, network:{}'.format(
-                host.name, client_id, network_id))
+            self.logger.debug('Meraki host unblock request successful for host:{} client:{}, network:{}, '
+                              'policy:{}'.format(host.name, client_id, network_id, device_policy))
             return [client_network]
         else:
-            self.logger.debug('Meraki host unblock request unsuccessful for host:{} client:{}, network:{}'.format(
-                host.name, client_id, network_id))
+            self.logger.debug('Meraki host unblock request unsuccessful for host:{} client:{}, network:{}, '
+                              'policy:{}'.format(host.name, client_id, network_id, device_policy))
             return [client_network]
 
     def block_detection(self, detection):
@@ -95,6 +112,18 @@ class MerakiClient(ThirdPartyInterface):
             for item in result.json():
                 networks.append(item.get('id'))
         return networks
+
+    def _get_client_policy(self, network_id, client_id):
+        """
+        Obtains clients policy
+        :param network_id: client's network id
+        :param client_id: client's id
+        :return: requests response (if ok: {"mac": "2c:6d:c1:2e:7f:f7", "devicePolicy": "Normal"}
+        """
+        if network_id and client_id:
+            result = requests.get(url=self.urlbase + '/networks/{}/clients/{}/policy'.format(network_id, client_id),
+                                  headers=self.headers, verify=self.verify)
+            return result
 
     def _get_client_id(self, ip, macs):
         """
@@ -134,20 +163,22 @@ class MerakiClient(ThirdPartyInterface):
         :return:  reqeust's response object
         """
         # https://developer.cisco.com/meraki/api-latest/#!update-network-client-policy
-        body = {"devicePolicy": "Blocked"}
-        response = requests.put(self.urlbase + '/networks/{}/clients/{}/policy'.format(client.get('net_id'),
-                                                                                       client.get('id')),
-                                headers=self.headers, data=json.dumps(body), verify=self.verify)
+        body = {"devicePolicy": self.block_policy}
+        response = requests.put(self.urlbase + '/networks/{}/clients/{}/policy'.format(
+            client.get('net_id'), client.get('id')), headers=self.headers, data=json.dumps(body), verify=self.verify
+                                )
         return response
 
-    def _unblock_client(self, client_id, net_id):
+    def _unblock_client(self, client_id, net_id, policy_id):
         """
         Unblock client by updating client's policy to 'Normal'
         :param client_id: client id
         :param net_id: network id
-        :return:  reqeust's response object
+        :param policy_id: policy id to set
+        :return:  request's response object
         """
-        body = {"devicePolicy": "Normal"}
+        # body = {"devicePolicy": "Normal"}
+        body = {"devicePolicy": policy_id}
         response = requests.put(self.urlbase + '/networks/{}/clients/{}/policy'.format(net_id, client_id),
                                 headers=self.headers, data=json.dumps(body), verify=self.verify)
         return response

@@ -21,7 +21,7 @@ from third_party_clients.pulse_nac import pulse_nac
 from third_party_clients.bitdefender import bitdefender
 from third_party_clients.meraki import meraki
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from config import (COGNITO_URL, COGNITO_API_KEY, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE, SLEEP_MINUTES,
+from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE, SLEEP_MINUTES,
                     NO_BLOCK_HOST_GROUP_NAME, BLOCK_HOST_THREAT_CERTAINTY, BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
                     BLOCK_HOST_DETECTION_TYPES, EXTERNAL_BLOCK_HOST_TC, EXTERNAL_BLOCK_DETECTION_TAG,
                     BLOCK_HOST_GROUP_NAME, EXTERNAL_BLOCK_DETECTION_TYPES)
@@ -590,11 +590,16 @@ def main():
     # ise_client = ise.ISEClient()
     # bitdefender_client = bitdefender.BitdefenderClient()
     # amp_client = amp.AMPClient
+<<<<<<< HEAD
     meraki_client = meraki.MerakiClient(use_keyring=args.keyring)
     if args.keyring:
         vectra_api_client = VectraClient(url=COGNITO_URL, token=keyring.get_password('VAE', 'Detect'))
     else:
-        vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_API_KEY)
+        vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+=======
+    # meraki_client = meraki.MerakiClient()
+    vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+>>>>>>> 045bb7fca740a65fef2b6cb76365dd59fe96138a
     vae = VectraActiveEnforcement(
         third_party_clients=[t_client],
         vectra_api_client=vectra_api_client,

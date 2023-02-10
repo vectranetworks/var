@@ -3,8 +3,8 @@ import time
 import keyring
 import requests
 import logging
-import sys
 import ipaddress
+import argparse
 import vat.vectra as vectra
 from datetime import datetime
 from requests import HTTPError
@@ -14,13 +14,14 @@ from third_party_clients.fortinet import fortinet
 from third_party_clients.vmware import vmware
 from third_party_clients.pan import pan
 from third_party_clients.cisco_ise import ise
+from third_party_clients.cisco_amp import amp
 from third_party_clients.trendmicro_apexone import apex_one
 from third_party_clients.test_client import test_client
 from third_party_clients.pulse_nac import pulse_nac
 from third_party_clients.bitdefender import bitdefender
 from third_party_clients.meraki import meraki
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
-from config import (COGNITO_URL, COGNITO_TOKEN, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE, SLEEP_MINUTES,
+from config import (COGNITO_URL, COGNITO_API_KEY, BLOCK_HOST_TAG, LOG_TO_FILE, LOG_FILE, SLEEP_MINUTES,
                     NO_BLOCK_HOST_GROUP_NAME, BLOCK_HOST_THREAT_CERTAINTY, BLOCK_HOST_DETECTION_TYPES_MIN_TC_SCORE,
                     BLOCK_HOST_DETECTION_TYPES, EXTERNAL_BLOCK_HOST_TC, EXTERNAL_BLOCK_DETECTION_TAG,
                     BLOCK_HOST_GROUP_NAME, EXTERNAL_BLOCK_DETECTION_TYPES)
@@ -571,14 +572,31 @@ class VectraActiveEnforcement(object):
 
 
 def main():
+    def obtain_args():
+        parser = argparse.ArgumentParser(description='Vectra Active Enforcement Framework ',
+                                         prefix_chars='--', formatter_class=argparse.RawTextHelpFormatter,
+                                         epilog='')
+        parser.add_argument('--loop', default=False, action='store_true', help='Run in loop.  '
+                                                                             'Required when ran as service.')
+        parser.add_argument('--keyring', default=False, action='store_true', help='Utilize system\'s keyring for'
+                                                                                'sensitive API keys.')
+        return parser.parse_args()
+
+    args = obtain_args()
+
+    # define required clients
     t_client = test_client.TestClient()
     # pulse_nac_client = pulse_nac.PulseNACClient()
     # ise_client = ise.ISEClient()
-    bitdefender_client = bitdefender.BitdefenderClient()
-    # meraki_client = meraki.MerakiClient()
-    vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+    # bitdefender_client = bitdefender.BitdefenderClient()
+    # amp_client = amp.AMPClient
+    meraki_client = meraki.MerakiClient(use_keyring=args.keyring)
+    if args.keyring:
+        vectra_api_client = VectraClient(url=COGNITO_URL, token=keyring.get_password('VAE', 'Detect'))
+    else:
+        vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_API_KEY)
     vae = VectraActiveEnforcement(
-        third_party_clients=[bitdefender_client],
+        third_party_clients=[t_client],
         vectra_api_client=vectra_api_client,
         block_host_tag=BLOCK_HOST_TAG,
         block_host_tc_score=BLOCK_HOST_THREAT_CERTAINTY,
@@ -602,7 +620,7 @@ def main():
 
         logging.info('Run finished\n\n\n')
 
-    if len(sys.argv) > 1 and sys.argv[1] == '-l':
+    if args.loop:
         while True:
             take_action()
             time.sleep(60 * SLEEP_MINUTES)

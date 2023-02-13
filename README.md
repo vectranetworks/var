@@ -10,14 +10,19 @@ Since adding a new third party integration only requires to extend that class, I
 
 # Third party integrations
 
-Currently, the following third party integrations are implemented: 
-1. Cisco ISE
-2. ClearPass
-3. Endgame
-4. Fortinet firewalls (FortiOS)
-5. Palo Alto firewalls (Panorama or not)
-6. VMWare vSphere
-7. Windows (direct PowerShell commands to shutdown host)
+Currently, the following third party integrations are implemented:
+1. Bitdefender
+2. Cisco ISE
+3. ClearPass
+4. Endgame
+5. Fortinet firewalls (FortiOS)
+6. Cisco Meraki
+7. Palo Alto Network firewalls (Panorama or not)
+8. Pulse Secure NAC
+9. Sophos Firewall
+10. Trendmicro Apex One
+11. VMWare vSphere
+12. Windows (direct PowerShell commands to shutdown host)
 
 Integration-specific documentation can be found in the [relevant folders](./third_party_clients/) of the third party integrations. 
 

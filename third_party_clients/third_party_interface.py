@@ -2,17 +2,20 @@ import abc
 from abc import ABCMeta
 from vectra_active_enforcement_consts import VectraHost, VectraDetection
 
+
 class ThirdPartyInterface(metaclass=abc.ABCMeta):
     @classmethod
     def __subclasshook__(cls, subclass):
         return (hasattr(subclass, 'block_host') and 
                 callable(subclass.block_host) and
                 hasattr(subclass, 'unblock_host') and 
-                callable(subclass.unblock_host) and 
+                callable(subclass.unblock_host) and
+                hasattr(subclass, 'groom_host') and
+                callable(subclass.groom_host) and
                 hasattr(subclass, 'block_detection') and 
                 callable(subclass.block_detection) and  
-                hasattr(subclass, 'unblock_detection') and 
-                callable(subclass.unblock_detection) or 
+                hasattr(subclass, 'unblock_detection') and
+                callable(subclass.unblock_detection) or
                 NotImplemented)
 
     def __init__(self):
@@ -31,6 +34,14 @@ class ThirdPartyInterface(metaclass=abc.ABCMeta):
         """
         Unlock a VectraHost instance on the corresponding FW/NAC
         :rtype: list of all elements that were unblocked
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def groom_host(self, host: VectraHost) -> dict:
+        """
+        Determine if a VectraHost instance needs to be blocked or unblocked.
+        :rtype: dictionary of all elements that require blocking or unblocking: {'block': [], 'unblock: []}
         """
         raise NotImplementedError
     

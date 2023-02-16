@@ -4,7 +4,7 @@ import urllib3
 import json
 import keyring
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.meraki.meraki_config_testing import MERAKI_URL, API_KEY, BLOCK_GROUP_POLICY, VERIFY
+from third_party_clients.meraki.meraki_config import MERAKI_URL, API_KEY, BLOCK_GROUP_POLICY, VERIFY
 
 urllib3.disable_warnings()
 
@@ -202,9 +202,11 @@ class MerakiClient(ThirdPartyInterface):
         """
         # https://developer.cisco.com/meraki/api-latest/#!update-network-client-policy
         body = {"devicePolicy": self.block_policy}
+        self.logger.debug('Device block policy: {}'.format(body))
         response = requests.put(self.urlbase + '/networks/{}/clients/{}/policy'.format(
             client.get('net_id'), client.get('id')), headers=self.headers, data=json.dumps(body), verify=self.verify
                                 )
+        self.logger.debug('Block request response: {}'.format(response.text))
         return response
 
     def _unblock_client(self, client_id, net_id, policy_id):

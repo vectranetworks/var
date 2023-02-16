@@ -530,6 +530,7 @@ class VectraActiveEnforcement(object):
         for host_id, host in hosts_to_groom.items():
             for third_party_client in self.third_party_clients:
                 groomed = third_party_client.groom_host(host=host)
+                self.logger.debug('groomed: {}'.format(groomed))
                 if groomed['unblock']:
                     self.logger.info('Groomed host {} to be unblocked based on IP change: {}'.format(host_id, host.ip))
                     try:
@@ -539,23 +540,21 @@ class VectraActiveEnforcement(object):
                                 'Unblocked element {}'.format(element))
                         self.logger.info('Unquaratained host {id} on client {client}'.format(
                             id=host_id, client=third_party_client.__class__.__name__))
-                        # Remove all tags set by this script from the host.
-                        # Sometimes a host can have both a block and unblock tag, we need to correct this.
-                        if 'block' in host.tags:
-                            self.logger.warning(
-                                'Host {} is in no-block list but has a "block" tag. Removing tag..'.format(
-                                    host.name))
-                            host.tags.remove('block')
+                        # if 'block' in host.tags:
+                        #     self.logger.warning(
+                        #         'Host {} is in no-block list but has a "block" tag. Removing tag..'.format(
+                        #             host.name))
+                        #     host.tags.remove('block')
                         self.vectra_api_client.set_host_tags(
                             host_id=host_id, tags=host.tags, append=False)
                         self.vectra_api_client.set_host_note(host_id=host_id,
-                                                             note='Automatically unblocked on {}'.format(
-                                                                 datetime.now().strftime('%d %b %Y at %H:%M:%S')))
-                        self.logger.debug('Removed tags')
+                                                             note='Automatically unblocked due to grooming on {}'
+                                                             .format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
+                        # self.logger.debug('Removed tags')
                     except HTTPException as e:
                         self.logger.error(
                             'Error encountered trying to unblock Host ID{}: {}'.format(host.id, str(e)))
-                elif groomed['block']:
+                if groomed['block']:
                     self.logger.info('Groomed host {} to be blocked based on IP change: {}'.format(host_id, host.ip))
                     try:
                         # Quarantaine endpoint

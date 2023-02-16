@@ -4,7 +4,7 @@ import urllib3
 import json
 import keyring
 from third_party_clients.third_party_interface import ThirdPartyInterface
-from third_party_clients.meraki.meraki_config import MERAKI_URL, API_KEY, BLOCK_GROUP_POLICY, VERIFY
+from third_party_clients.meraki.meraki_config_testing import MERAKI_URL, API_KEY, BLOCK_GROUP_POLICY, VERIFY
 
 urllib3.disable_warnings()
 
@@ -91,6 +91,27 @@ class MerakiClient(ThirdPartyInterface):
                               'policy:{}'.format(host.name, client_id, network_id, device_policy))
             return [client_network]
 
+    def groom_host(self, host) -> dict:
+        """
+        Method to determine if currently blocked client exists based on client id
+        :param host: Vectra host object
+        :return: return {'block': host, 'unblock': host.blocked_elements}
+        """
+        self.logger.info('Groom host called.  Host tags: {}'.format(host.blocked_elements))
+        meraki_blocked_elements = host.blocked_elements.get('MerakiClient')
+        if meraki_blocked_elements:
+            clients_list = self._get_client_id(host.ip, host.mac_addresses)
+            for element in meraki_blocked_elements:
+                if element.split(':')[0] in clients_list:
+                    # Client found by blocked ClientID, don't do anything
+                    self.logger.info('Host grooming client still active, doing nothing.')
+                    return {'block': False, 'unblock': False}
+                else:
+                    # Client not found, return host object to be blocked, return blocked_elements to unblock
+                    self.logger.info('Host grooming client not found, requesting original client to unblock and current'
+                                     ' client to block.')
+                    return {'block': True, 'unblock': True}
+
     def block_detection(self, detection):
         self.logger.warning('Meraki client does not implement detection-based blocking')
         return []
@@ -113,6 +134,21 @@ class MerakiClient(ThirdPartyInterface):
                 networks.append(item.get('id'))
         return networks
 
+    def _get_client(self, network_id, client_id):
+        """
+                Obtains client by client ID
+                :param network_id: client's network id
+                :param client_id: client's id
+                :return: requests response (if ok: {"mac": "2c:6d:c1:2e:7f:f7", "devicePolicy": "Normal"}, if 404:
+                {"errors": ["Client not found"]})
+                """
+        if network_id and client_id:
+            result = requests.get(url=self.urlbase + '/networks/{}/clients/{}'.format(network_id, client_id),
+                                  headers=self.headers, verify=self.verify)
+            return result
+        else:
+            return None
+
     def _get_client_policy(self, network_id, client_id):
         """
         Obtains clients policy
@@ -124,6 +160,8 @@ class MerakiClient(ThirdPartyInterface):
             result = requests.get(url=self.urlbase + '/networks/{}/clients/{}/policy'.format(network_id, client_id),
                                   headers=self.headers, verify=self.verify)
             return result
+        else:
+            return None
 
     def _get_client_id(self, ip, macs):
         """

@@ -385,7 +385,7 @@ class VectraActiveEnforcement(object):
                 result_dict[key] = value
         return result_dict
 
-    def get_hosts_to_block_unblock(self):
+    def get_hosts_to_block_unblock(self, groom=False):
         """
         Get all host IDs matching the criteria to be blocked or unblocked
         :rtype: list
@@ -426,7 +426,13 @@ class VectraActiveEnforcement(object):
         hosts_to_unblock = {**hosts_to_unblock, **hosts_wrongly_blocked}
         self.logger.info('Found {} hosts that need to be unblocked'.format(
             str(len(hosts_to_unblock.keys()))))
-        return hosts_to_block, hosts_to_unblock
+        hosts_to_groom = {}
+        if groom:
+            # Compute hosts to be groomed
+            hosts_to_groom = self._get_dict_keys_relative_complement(blocked_hosts, hosts_wrongly_blocked)
+            self.logger.info('Found {} hosts that need to be groomed'.format(len(hosts_to_groom.keys())))
+            self.logger.info('Hosts to groom: {}'.format(hosts_to_groom.keys()))
+        return hosts_to_block, hosts_to_unblock, hosts_to_groom
 
     def get_detections_to_block_unblock(self):
         # Get a list of all detections that should be unblocked or never blocked
@@ -520,6 +526,58 @@ class VectraActiveEnforcement(object):
                     self.logger.error(
                         'Error encountered trying to unblock Host ID{}: {}'.format(host.id, str(e)))
 
+    def groom_hosts(self, hosts_to_groom):
+        for host_id, host in hosts_to_groom.items():
+            for third_party_client in self.third_party_clients:
+                groomed = third_party_client.groom_host(host=host)
+                self.logger.debug('groomed: {}'.format(groomed))
+                if groomed['unblock']:
+                    self.logger.info('Groomed host {} to be unblocked based on IP change: {}'.format(host_id, host.ip))
+                    try:
+                        unblocked_elements = third_party_client.unblock_host(host)
+                        for element in unblocked_elements:
+                            self.logger.debug(
+                                'Unblocked element {}'.format(element))
+                        self.logger.info('Unquaratained host {id} on client {client}'.format(
+                            id=host_id, client=third_party_client.__class__.__name__))
+                        # if 'block' in host.tags:
+                        #     self.logger.warning(
+                        #         'Host {} is in no-block list but has a "block" tag. Removing tag..'.format(
+                        #             host.name))
+                        #     host.tags.remove('block')
+                        self.vectra_api_client.set_host_tags(
+                            host_id=host_id, tags=host.tags, append=False)
+                        self.vectra_api_client.set_host_note(host_id=host_id,
+                                                             note='Automatically unblocked due to grooming on {}'
+                                                             .format(datetime.now().strftime('%d %b %Y at %H:%M:%S')))
+                        # self.logger.debug('Removed tags')
+                    except HTTPException as e:
+                        self.logger.error(
+                            'Error encountered trying to unblock Host ID{}: {}'.format(host.id, str(e)))
+                if groomed['block']:
+                    self.logger.info('Groomed host {} to be blocked based on IP change: {}'.format(host_id, host.ip))
+                    try:
+                        # Quarantaine endpoint
+                        blocked_elements = third_party_client.block_host(host=host)
+                        self.logger.info('Blocked host {id} on client {client}'.format(
+                            id=host_id, client=third_party_client.__class__.__name__))
+                        # Set a "VAE Blocked" to set the host as being blocked and registed what elements were blocked in separate tags
+                        tag_to_set = ['VAE Blocked']
+                        if len(blocked_elements) < 1:
+                            self.logger.warning(
+                                'Did not find any elements to block on host ID {}'.format(host_id))
+                        for element in blocked_elements:
+                            tag_to_set.append('VAE ID:{client_class}:{id}'.format(
+                                client_class=third_party_client.__class__.__name__, id=element))
+                        self.vectra_api_client.set_host_tags(
+                            host_id=host_id, tags=tag_to_set, append=True)
+                        self.vectra_api_client.set_host_note(host_id=host_id, note='Automatically blocked on {}'.format(
+                            datetime.now().strftime('%d %b %Y at %H:%M:%S')))
+                        self.logger.debug('Added Tags to host')
+                    except HTTPException as e:
+                        self.logger.error(
+                            'Error encountered trying to block Host ID {}: {}'.format(host.id, str(e)))
+
     def block_detections(self, detections_to_block):
         for detection_id, detection in detections_to_block.items():
             for third_party_client in self.third_party_clients:
@@ -576,29 +634,33 @@ def main():
         parser = argparse.ArgumentParser(description='Vectra Active Enforcement Framework ',
                                          prefix_chars='--', formatter_class=argparse.RawTextHelpFormatter,
                                          epilog='')
-        parser.add_argument('--loop', default=False, action='store_true', help='Run in loop.  '
-                                                                             'Required when ran as service.')
-        parser.add_argument('--keyring', default=False, action='store_true', help='Utilize system\'s keyring for'
-                                                                                'sensitive API keys.')
+        parser.add_argument('--loop', default=False, action='store_true',
+                            help='Run in loop.  Required when ran as service or caching.')
+        parser.add_argument('--keyring', default=False, action='store_true',
+                            help='Utilize system\'s keyring for sensitive API keys.')
+        parser.add_argument('--groom', default=False, action='store_true',
+                            help='Attempt to re-block hosts to accommodate changes to IP addresses.')
         return parser.parse_args()
 
     args = obtain_args()
 
-    # define required clients
-    t_client = test_client.TestClient()
-    # pulse_nac_client = pulse_nac.PulseNACClient()
-    # ise_client = ise.ISEClient()
-    # bitdefender_client = bitdefender.BitdefenderClient()
-    # amp_client = amp.AMPClient
-    meraki_client = meraki.MerakiClient(use_keyring=args.keyring)
     if args.keyring:
+        # Modules enabled to utilize Keyring
         vectra_api_client = VectraClient(url=COGNITO_URL, token=keyring.get_password('VAE', 'Detect'))
+        t_client = test_client.TestClient()
+        meraki_client = meraki.MerakiClient(use_keyring=args.keyring)
     else:
+        # define required clients
         vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
-    # meraki_client = meraki.MerakiClient()
-    vectra_api_client = VectraClient(url=COGNITO_URL, token=COGNITO_TOKEN)
+        t_client = test_client.TestClient()
+        meraki_client = meraki.MerakiClient(use_keyring=args.keyring)
+        # pulse_nac_client = pulse_nac.PulseNACClient()
+        # ise_client = ise.ISEClient()
+        # bitdefender_client = bitdefender.BitdefenderClient()
+        # amp_client = amp.AMPClient
+
     vae = VectraActiveEnforcement(
-        third_party_clients=[t_client],
+        third_party_clients=[meraki_client],
         vectra_api_client=vectra_api_client,
         block_host_tag=BLOCK_HOST_TAG,
         block_host_tc_score=BLOCK_HOST_THREAT_CERTAINTY,
@@ -612,15 +674,16 @@ def main():
     )
 
     def take_action():
-        hosts_to_block, hosts_to_unblock = vae.get_hosts_to_block_unblock()
+        hosts_to_block, hosts_to_unblock, hosts_to_groom = vae.get_hosts_to_block_unblock(groom=args.groom)
         vae.block_hosts(hosts_to_block)
         vae.unblock_hosts(hosts_to_unblock)
+        vae.groom_hosts(hosts_to_groom)
 
         detections_to_block, detections_to_unblock = vae.get_detections_to_block_unblock()
         vae.block_detections(detections_to_block)
         vae.unblock_detections(detections_to_unblock)
 
-        logging.info('Run finished\n\n\n')
+        logging.info('Run finished. \n\n\n')
 
     if args.loop:
         while True:

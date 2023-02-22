@@ -141,7 +141,11 @@ class FortiClient(ThirdPartyInterface):
                 self.update_fortinet_group(firewall, ip_address=ip_address, block_type=BlockType.SOURCE, append=False)
                 self.unregister_address(firewall, ip_address)
         return ip_addresses
-    
+
+    def groom_host(self, host) -> dict:
+        self.logger.warning('Fortinet client does not implement host grooming')
+        return []
+
     def block_detection(self, detection):
         ip_addresses = detection.dst_ips
         for firewall in self.firewalls:

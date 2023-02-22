@@ -52,6 +52,10 @@ class VMWareClient(ThirdPartyInterface):
                 break # break the parent loop as well
         return [uuid]
 
+    def groom_host(self, host) -> dict:
+        self.logger.warning('VMWare client does not implement host grooming')
+        return []
+
     def unblock_host(self, host):
         # We use a mix of instance and BIOS UUID. We can use the UUID we have on the host container, not the tag as this in constant.
         uuid = host.vmware_vm_uuid[:36]

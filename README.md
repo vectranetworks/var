@@ -129,3 +129,14 @@ vae.block_detections(detections_to_block)
 vae.unblock_detections(detections_to_unblock)
 ```
 
+## Running the script
+The script can be run manually, via a cron job, or as a service.  If running as a service, specify the `--loop`
+flag to run the script in a continuous loop with the pause time configured in the `config.py` file's variable 
+`SLEEP_MINUTES`.
+### Additional options
+#### Keying
+Modules may be modified to utilize API keys or credentials stored in the local system's keying.  Specifying
+the `--keyring` flag will enable this feature for the supported modules.
+#### Monitoring for IP changes
+Modules may support attempting to re-block a host (re-grooming) if that host's IP has changed since it was originall
+blocked.  To enable re-grooming for supported modules specify the `--groom` flag.

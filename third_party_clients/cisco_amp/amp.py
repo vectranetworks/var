@@ -42,6 +42,10 @@ class AMPClient(ThirdPartyInterface):
             self.logger.info("Host already unblocked. Skipping host.")
         self.logger.info("Host successfully unblocked.")
         return [host.ip]
+
+    def groom_host(self, host) -> dict:
+        self.logger.warning('AMP client does not implement host grooming')
+        return []
     
     def block_detection(self, detection):
         # this client only implements Host-based blocking

@@ -24,7 +24,11 @@ class SophosClient(ThirdPartyInterface):
 
     def unblock_host(self, host) -> list[str]:
         return self._unblock_ip(ip=host.ip)
-    
+
+    def groom_host(self, host) -> dict:
+        self.logger.warning('Sophos client does not implement host grooming')
+        return []
+
     def block_detection(self, detection):
         # this client only implements Host-based blocking
         self.logger.warn("Sophos client does not implement detection-based blocking")

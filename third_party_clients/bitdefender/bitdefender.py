@@ -76,6 +76,10 @@ class BitdefenderClient(ThirdPartyInterface):
                 self.logger.info('No proper endpoint id supplied:{}'.format(endpoint_ids))
         return endpoint_ids
 
+    def groom_host(self, host) -> dict:
+        self.logger.warning('Bitdefender client does not implement host grooming')
+        return []
+
     def block_detection(self, detection):
         # this client only implements Host-based blocking
         self.logger.warn('Bitdefender client does not implement detection-based blocking')

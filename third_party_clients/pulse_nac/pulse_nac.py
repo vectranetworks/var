@@ -155,6 +155,10 @@ class PulseNACClient(ThirdPartyInterface):
                     pass
         return mac_addresses
 
+    def groom_host(self, host) -> dict:
+        self.logger.warning('Pulse NAC client does not implement host grooming')
+        return []
+
     def block_detection(self, detection):
         self.logger.warning('Pulse NAC client does not implement detection-based blocking')
         return []

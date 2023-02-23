@@ -112,7 +112,11 @@ class ISEClient(ThirdPartyInterface):
         for mac_address in mac_addresses:
             self._unquarantaine_endpoint(mac_address)
         return mac_addresses
-    
+
+    def groom_host(self, host) -> dict:
+        self.logger.warning('ISE client does not implement host grooming')
+        return []
+
     def block_detection(self, detection):
         # this client only implements Host-based blocking
         self.logger.warn('ISE client does not implement detection-based blocking')

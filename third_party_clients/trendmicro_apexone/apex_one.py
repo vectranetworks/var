@@ -49,6 +49,10 @@ class TrendMicroClient(ThirdPartyInterface):
                     mac_address=mac_address, act="cmd_restore_isolated_agent")
             return mac_addresses
 
+    def groom_host(self, host) -> dict:
+        self.logger.warning('ApexOne client does not implement host grooming')
+        return []
+
     def block_detection(self, detection):
         # this client only implements Host-based blocking
         self.logger.warn(

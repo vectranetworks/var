@@ -48,7 +48,11 @@ class ClearPassClient(ThirdPartyInterface):
             self._patch_endpoint(mac_address, isolated=False)
             self._disconnect_session(mac_address)
         return mac_addresses
-    
+
+    def groom_host(self, host) -> dict:
+        self.logger.warning('Clear Pass client does not implement host grooming')
+        return []
+
     def block_detection(self, detection):
         # this client only implements Host-based blocking
         self.logger.warn('VMWare client does not implement detection-based blocking')

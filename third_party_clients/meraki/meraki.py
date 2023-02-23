@@ -75,7 +75,7 @@ class MerakiClient(ThirdPartyInterface):
 
     def unblock_host(self, host):
         client_network = host.blocked_elements.get(self.__class__.__name__, [])
-        self.logger.debug('client_network:{}'.format(client_network))
+        self.logger.debug('client_network from tag:{}'.format(client_network))
         client_id = client_network[0].split(':')[0]
         network_id = client_network[0].split(':')[1]
         device_policy = client_network[0].split(':')[2]
@@ -111,6 +111,9 @@ class MerakiClient(ThirdPartyInterface):
                     self.logger.info('Host grooming client not found, requesting original client to unblock and current'
                                      ' client to block.')
                     return {'block': True, 'unblock': True}
+        else:
+            # No Meraki blocked elements
+            return {'block': False, 'unblock': False}
 
     def block_detection(self, detection):
         self.logger.warning('Meraki client does not implement detection-based blocking')

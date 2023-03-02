@@ -6,23 +6,27 @@ from third_party_clients.third_party_interface import ThirdPartyInterface
 
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
+
 class AMPClient(ThirdPartyInterface):
     def __init__(self):
         self.logger = logging.getLogger()
         self._check_connection()
         # Instantiate parent class
-        ThirdPartyInterface.__init__ (self)
+        ThirdPartyInterface.__init__(self)
 
     def block_host(self, host) -> list[str]:
         self.logger.info(f"Processing block request for host with IP: {host.ip}")
         cguid = self._get_connector_guid(host.ip)
         isolation_state = self._get_block_state(cguid)
-        if isolation_state == 'not_isolated' or isolation_state == 'pending_stop':
+        if isolation_state is not None and (isolation_state == 'not_isolated' or isolation_state == 'pending_stop'):
             self._block_host_by_connector_guid(cguid)
             isolation_state = self._get_block_state(cguid)
             if not isolation_state == 'pending_start' or isolation_state == 'isolated':
-                self.logger.error("Expected isolation status to be 'pending_start' or 'isolated'.")
-                exit()
+                self.logger.error("Expected isolation status to be 'pending_start' or 'isolated'.  Not blocking.")
+                return []
+        elif isolation_state is None:
+            self.logger.info("Has invalid isolation state. Skipping host.")
+            return []
         else:
             self.logger.info("Host already blocked. Skipping host.")
         self.logger.info("Host successfully blocked.")
@@ -32,12 +36,15 @@ class AMPClient(ThirdPartyInterface):
         self.logger.info(f"Processing unblock request for host with IP: {host.ip}")
         cguid = self._get_connector_guid(host.ip)
         isolation_state = self._get_block_state(cguid)
-        if isolation_state == 'isolated' or isolation_state == 'pending_start':
+        if isolation_state is not None and (isolation_state == 'isolated' or isolation_state == 'pending_start'):
             self._unblock_host_by_connector_guid(cguid)
             isolation_state = self._get_block_state(cguid)
             if not isolation_state == 'pending_stop' or isolation_state == 'not_isolated':
-                self.logger.error("Expected isolation status to be 'pending_stop' or 'not_isolated'.")
-                exit()
+                self.logger.error("Expected isolation status to be 'pending_stop' or 'not_isolated'.  Not unblocking.")
+                return []
+        elif isolation_state is None:
+            self.logger.info("Has invalid isolation state. Skipping host.")
+            return []
         else:
             self.logger.info("Host already unblocked. Skipping host.")
         self.logger.info("Host successfully unblocked.")
@@ -84,10 +91,10 @@ class AMPClient(ThirdPartyInterface):
         
         if data['metadata']['results']['total'] > 1:
             self.logger.error(f'Found more than 1 host with IP {ip}')
-            exit()
+            return None
         elif data['metadata']['results']['total'] == 0:
             self.logger.error(f'Found no host with IP {ip}')
-            exit()
+            return None
         else:
             cguid = data['data'][0]['connector_guid']
             self.logger.info(f"Connector guid received: {cguid}")
@@ -106,7 +113,7 @@ class AMPClient(ThirdPartyInterface):
         
         if not data['data']['available']:
             self.logger.error(f"Isolation unavailable for host identified by connector guid {connector_guid}.")
-            exit()
+            return None
         else:
             isolation_state = data['data']['status']
             self.logger.info(f"Isolation available. Isolation state received: {isolation_state}")

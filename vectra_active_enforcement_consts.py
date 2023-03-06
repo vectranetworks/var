@@ -18,8 +18,28 @@ class VectraHost:
         self.vmware_vm_uuid = self._get_vmware_vm_uuid(host['host_artifact_set'])
         self.aws_vm_uuid = self._get_aws_vm_uuid(host['host_artifact_set'])
         self.tags = self._get_external_tags(host['tags'])
-        self.note = host['note']
+        self.most_recent_note = host["note"]
         self.blocked_elements = self._get_blocked_elements(host['tags'])
+        self._raw = host
+    
+    def get_full_name(self):
+        if "windows_defender_name" in self.artifacts_types:
+            return self._get_artifact_value("windows_defender_name")[0]
+        if "dns" in self.artifacts_types:
+            return self._get_artifact_value("dns")[0]
+        if "rdns" in self.artifacts_types:
+            return self._get_artifact_value("rdns")[0]
+        if self._raw["ldap"]:
+            if "dns_hostname" in self._raw["ldap"].keys():
+                return self._raw["ldap"]["dns_hostname"][0]
+        return self.name
+
+    def _get_artifact_value(self, artifact_type):
+        values = set()
+        for artifact in self._raw["host_artifact_set"]:
+            if artifact["type"] == artifact_type:
+                values.add(artifact["value"])
+        return list(values)
 
     def _get_artifact_types(self, artifact_set):
         artifact_keys = set()

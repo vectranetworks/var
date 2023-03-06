@@ -16,16 +16,19 @@ class AMPClient(ThirdPartyInterface):
 
     def block_host(self, host) -> list[str]:
         self.logger.info(f"Processing block request for host with IP: {host.ip}")
-        cguid = self._get_connector_guid(host.ip)
+        cguid = self._get_connector_guid(host.ip, host.get_full_name())
+        if cguid is None:
+            self.logger.error("Could not identify unique connector_guid. Skipping host.")
+            return []
         isolation_state = self._get_block_state(cguid)
         if isolation_state is not None and (isolation_state == 'not_isolated' or isolation_state == 'pending_stop'):
             self._block_host_by_connector_guid(cguid)
             isolation_state = self._get_block_state(cguid)
             if not isolation_state == 'pending_start' or isolation_state == 'isolated':
-                self.logger.error("Expected isolation status to be 'pending_start' or 'isolated'.  Not blocking.")
+                self.logger.error("Expected isolation status to be 'pending_start' or 'isolated'.  Skipping host.")
                 return []
         elif isolation_state is None:
-            self.logger.info("Has invalid isolation state. Skipping host.")
+            self.logger.error("Has invalid isolation state. Skipping host.")
             return []
         else:
             self.logger.info("Host already blocked. Skipping host.")
@@ -34,16 +37,19 @@ class AMPClient(ThirdPartyInterface):
 
     def unblock_host(self, host) -> list[str]:
         self.logger.info(f"Processing unblock request for host with IP: {host.ip}")
-        cguid = self._get_connector_guid(host.ip)
+        cguid = self._get_connector_guid(host.ip, host.get_full_name())
+        if cguid is None:
+            self.logger.error("Could not identify unique connector_guid. Skipping host.")
+            return []
         isolation_state = self._get_block_state(cguid)
         if isolation_state is not None and (isolation_state == 'isolated' or isolation_state == 'pending_start'):
             self._unblock_host_by_connector_guid(cguid)
             isolation_state = self._get_block_state(cguid)
             if not isolation_state == 'pending_stop' or isolation_state == 'not_isolated':
-                self.logger.error("Expected isolation status to be 'pending_stop' or 'not_isolated'.  Not unblocking.")
+                self.logger.error("Expected isolation status to be 'pending_stop' or 'not_isolated'. Skipping host.")
                 return []
         elif isolation_state is None:
-            self.logger.info("Has invalid isolation state. Skipping host.")
+            self.logger.error("Has invalid isolation state. Skipping host.")
             return []
         else:
             self.logger.info("Host already unblocked. Skipping host.")
@@ -78,8 +84,8 @@ class AMPClient(ThirdPartyInterface):
         except:
             self.logger.info("Cisco AMP connection check failed.")
 
-    def _get_connector_guid(self, ip):
-        self.logger.info(f"Querying unique connector guid for host with IP: {ip}")
+    def _get_connector_guid(self, ip, hostname):
+        self.logger.info(f"Querying unique connector guid for host {hostname} with IP: {ip}")
         api_endpoint = f'computers?internal_ip={ip}'
         response = requests.get(
             url=f'{URL}/v1/{api_endpoint}',
@@ -89,16 +95,37 @@ class AMPClient(ThirdPartyInterface):
         response.raise_for_status()
         data = response.json()
         
-        if data['metadata']['results']['total'] > 1:
-            self.logger.error(f'Found more than 1 host with IP {ip}')
-            return None
-        elif data['metadata']['results']['total'] == 0:
-            self.logger.error(f'Found no host with IP {ip}')
-            return None
-        else:
+        if data['metadata']['results']['total'] == 1:
             cguid = data['data'][0]['connector_guid']
             self.logger.info(f"Connector guid received: {cguid}")
             return cguid
+        else:
+            if data['metadata']['results']['total'] > 1:
+                msg = f'Found more than 1 host with IP {ip}'
+            else:
+                msg = f'Found no host with IP {ip}'
+            self.logger.info(f'{msg} - Searching by hostname instead.')
+            
+            api_endpoint = f'computers?hostname={hostname}'
+            response = requests.get(
+                url=f'{URL}/v1/{api_endpoint}',
+                verify=False,
+                auth=(CLIENT_ID, API_KEY)
+                )
+            response.raise_for_status()
+            data = response.json()
+            
+            if data['metadata']['results']['total'] == 1:
+                cguid = data['data'][0]['connector_guid']
+                self.logger.info(f"Connector guid received: {cguid}")
+                return cguid
+            else:
+                if data['metadata']['results']['total'] > 1:
+                    error_msg = f'Found more than 1 host with hostname {hostname}'
+                else:
+                    error_msg = f'Found no host with hostname {hostname}'
+                self.logger.error(f'{error_msg} - Aborting.')
+                return None
 
     def _get_block_state(self, connector_guid):
         self.logger.info(f"Querying isolation state for host identified by connector guid {connector_guid}.")

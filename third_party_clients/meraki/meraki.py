@@ -29,7 +29,7 @@ class MerakiClient(ThirdPartyInterface):
 
     def __init__(self, use_keyring):
         self.urlbase = MERAKI_URL.strip('/')
-        if use_keyring:
+        if not use_keyring:
             self.token = API_KEY
         else:
             self.token = keyring.get_password('VAE', 'Meraki')
